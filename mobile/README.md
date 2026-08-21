@@ -176,11 +176,28 @@ signature :
 ```
 cd mobile && xcodegen generate
 xcodebuild -project Mob.xcodeproj -scheme Mob \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build \
+  -skipMacroValidation \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
+
+**⚠️ Le `-skipMacroValidation` n'est pas décoratif.** `LLM.swift`
+embarque des macros Swift, et Xcode refuse d'exécuter la macro d'un
+paquet tant qu'elle n'a pas été explicitement approuvée. Sans ce
+drapeau, le build s'arrête sur :
+
+```
+error: Macro "LLMMacrosImplementation" from package "LLM"
+must be enabled before it can be used
+```
+
+Vérifié en conditions réelles : c'est exactement là que le premier
+build en intégration continue a échoué. Dans Xcode en interface
+graphique, ça se présente à la place comme une boîte de dialogue
+**« Trust & Enable »** à accepter une fois — facile à rater, et le
+message d'erreur ne dit pas quoi cliquer.
 
 Une fois que ça passe, l'installation sur ton iPhone :
 
