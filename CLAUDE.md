@@ -1,33 +1,19 @@
 # Jarvis — contexte persistant
 
-## ⚠️ Important — première tâche avant toute chose
+## ✅ Validation réelle d'Ollama — faite
 
-Tout ce qui existe dans ce dépôt (`jarvis.py`, `memory.py`, les tests) a été
-écrit et testé **par simulation uniquement** : les appels réseau vers Ollama
-sont mockés dans `test_jarvis.py` (`unittest.mock.patch` sur
-`urllib.request.urlopen`). Ce code n'a **jamais tourné contre un vrai serveur
-Ollama** — l'environnement qui l'a écrit n'y avait pas accès.
-
-Toi, Claude Code, tu tournes sur la machine de l'utilisateur et tu peux
-réellement lancer `ollama serve`. **Ta première tâche, avant de construire
-l'étape 4, est de valider `jarvis.py`, `test_jarvis.py` et `test_memory.py`
-en conditions réelles** :
-
-1. Vérifie qu'Ollama est installé (`ollama --version`), sinon guide
-   l'utilisateur pour l'installer.
-2. `ollama serve` (si pas déjà lancé) puis `ollama pull llama3` (ou un autre
-   modèle léger disponible).
-3. Lance `python3 jarvis.py` et discute avec pour de vrai, y compris une
-   requête de calcul (ex. « combien font 12 * 7 ? ») pour vérifier que le
-   marqueur `CALC(...)` et l'outil safe-eval fonctionnent avec les réponses
-   réelles du modèle.
-4. Compare la forme réelle de la réponse Ollama
-   (`POST /api/chat` → `{"message": {"role", "content"}, ...}`) à ce que
-   `call_ollama()` attend dans `jarvis.py`. Corrige `call_ollama` si le
-   schéma réel diffère (champs manquants, `stream` géré différemment,
-   modèle absent localement, etc.).
-5. Ne construis l'étape 4 (voir plus bas) qu'une fois cette validation faite
-   et les éventuels écarts corrigés.
+`jarvis.py` a été testé contre un **vrai serveur Ollama** (installé et lancé
+dans une session Claude Code, modèle `llama3.2:1b`, CPU pur) :
+`call_ollama()` tape bien `POST /api/chat` et la réponse réelle a exactement
+la forme attendue (`{"message": {"role", "content"}, ...}`) — aucun écart de
+schéma, aucune correction nécessaire. Testé bout en bout : conversation
+normale, dégradation propre sur URL injoignable (`[Jarvis is offline: ...]`,
+pas de crash), et le marqueur `CALC(12*7)` correctement détecté et évalué à
+84 par `safe_eval()`. Les 19 tests mockés passent toujours. Cette validation
+a eu lieu dans un conteneur cloud éphémère (pas la machine de l'utilisateur),
+mais Ollama et le code testé sont réels — si tu relances cette validation sur
+la machine réelle de l'utilisateur, considère-la comme une reconfirmation,
+pas comme un prérequis bloquant avant l'étape 4.
 
 Même chose côté mobile : le code Swift dans `mobile/Mob/` n'a **jamais été
 compilé** (cet environnement de travail est un conteneur Linux sans Xcode).
@@ -51,11 +37,10 @@ du package `LLM.swift` une fois résolu par Swift Package Manager (voir
   `CALC(<expression>)` dans la réponse du modèle, évalué par `safe_eval()`
   (parcours d'AST restreint aux opérateurs arithmétiques — jamais
   `eval()` brut).
-- **Étape 4 — à faire** : validation contre un vrai serveur Ollama (voir
-  section ci-dessus) et correction des écarts de schéma trouvés.
+- **Étape 4 — faite** : validation contre un vrai serveur Ollama (voir
+  section ci-dessus) — aucun écart de schéma, aucune correction nécessaire.
 - **Étape 5 — à faire** : orchestration multi-outils (au-delà de la seule
-  calculatrice — ex. lecture de fichier, recherche web), à ne démarrer
-  qu'une fois l'étape 4 validée.
+  calculatrice — ex. lecture de fichier, recherche web).
 - **Piste mobile (iPhone) — scaffold écrit, non compilé** : app SwiftUI
   dans `mobile/Mob/` qui porte les mêmes conventions (safe-eval,
   dégradation propre) sur iOS, et déclenchement vocal via App
