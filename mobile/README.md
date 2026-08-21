@@ -38,7 +38,9 @@ développeurs Apple). Concrètement : téléphone verrouillé + Face ID qui
 te reconnaît d'un coup d'œil → quasi invisible ; téléphone à plat ou en
 poche → il faut le sortir et taper le code avant que Mob n'écoute. Ce
 n'est donc pas "sans toucher l'écran" dans tous les cas — seulement
-quand le téléphone est déjà déverrouillé ou que Face ID te voit.
+quand le téléphone est déjà déverrouillé ou que Face ID te voit. Sur
+iPhone 17 Pro, c'est Face ID (pas de Touch ID) : le cas "poche/table"
+demandera donc le code, pas une empreinte.
 
 ## Prérequis
 
@@ -70,11 +72,26 @@ quand le téléphone est déjà déverrouillé ou que Face ID te voit.
 4. **Ajoute un modèle `.gguf`** au bundle de l'app (target Mob →
    Build Phases → Copy Bundle Resources) sous le nom
    `mob-model.gguf` (ou change `modelResourceName` dans
-   `ContentView.swift`). Pour un iPhone, privilégie un petit modèle
-   quantifié, ex. Llama 3.2 1B Instruct (Q4_K_M) ou Gemma 3 270M/1B —
-   disponibles en `.gguf` sur Hugging Face (comptes comme
-   `bartowski` ou `ggml-org` publient des quantifications prêtes à
-   l'emploi). Vérifie la licence du modèle choisi avant diffusion.
+   `ContentView.swift`). Le choix dépend du téléphone : sur un iPhone
+   d'entrée de gamme (≤6-8 Go de RAM), reste sur un petit modèle comme
+   Llama 3.2 1B Instruct ou Gemma 3 270M/1B (Q4_K_M). **Sur iPhone 17
+   Pro (A19 Pro, 12 Go de RAM, Neural Engine 16 cœurs)**, tu as la marge
+   pour un modèle nettement plus capable — vise plutôt un **Llama 3.2
+   3B Instruct** ou **Qwen2.5 3B Instruct** quantifié en Q4_K_M
+   (~2 Go), pour de meilleures réponses sans changer d'architecture.
+   Reste prudent au-delà (un 7-8B passera en mémoire mais cognera
+   contre la limite mémoire par app d'iOS — le "jetsam" — surtout avec
+   d'autres apps ouvertes en tâche de fond). Modèles en `.gguf`
+   disponibles sur Hugging Face (comptes comme `bartowski` ou
+   `ggml-org` publient des quantifications prêtes à l'emploi). Vérifie
+   la licence du modèle choisi avant diffusion.
+
+   Note pour plus tard : le Neural Engine 16 cœurs de l'A19 Pro (avec
+   accélérateurs dédiés par cœur) n'est pas exploité par `LLM.swift`
+   (backend Metal/GPU via llama.cpp) — le framework MLX d'Apple tire
+   mieux parti du Neural Engine sur ce chip. Pas un changement à faire
+   maintenant, mais une piste d'optimisation valable une fois le
+   scaffold actuel validé.
 5. **Active la capacité Siri** : target Mob → Signing & Capabilities →
    `+ Capability` → `Siri`.
 6. **Ajoute ces clés à `Info.plist`** (texte à adapter) :
