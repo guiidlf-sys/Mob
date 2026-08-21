@@ -1,0 +1,56 @@
+name: Build iOS app
+
+# Compiles Mob on a GitHub-hosted macOS runner. The point is to get real
+# compiler errors without needing a Mac of our own: the project was
+# written in a Linux container where nothing Swift can be built.
+#
+# Simulator destination with signing disabled on purpose — that combination
+# needs no Apple ID, no certificate and no device, so it isolates genuine
+# code errors from provisioning problems. Installing on an actual iPhone
+# still requires the owner's Apple ID and cannot happen here.
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Compile for simulator (unsigned)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Mob.xcodeproj from project.yml
+        working-directory: mobile
+        run: xcodegen generate
+
+      # No .gguf model in the repo (~2 GB, gitignored). Its absence does not
+      # affect compilation — LLMEngine looks it up at runtime and degrades to
+      # an "offline" message, so an unsigned simulator build still proves the
+      # code compiles and links.
+      - name: Build
+        working-directory: mobile
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Mob.xcodeproj \
+            -scheme Mob \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
