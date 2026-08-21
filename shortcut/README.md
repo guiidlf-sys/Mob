@@ -49,20 +49,26 @@ Ajoute ces actions dans l'ordre :
       en gardant l'espace)
     - `Content-Type` → `application/json`
   - **Corps de la requête** : `JSON`, puis construis :
-    - `model` (Texte) → `mistral-small-latest`
-    - `messages` (Tableau) → deux dictionnaires :
-      - 1er : `role` → `system`, `content` → *voir le texte ci-dessous*
-      - 2e : `role` → `user`, `content` → **Texte dicté** (la variable
-        de l'étape 1, pas du texte tapé)
+    - champ **Texte** nommé `model` → `mistral-small-latest`
+    - champ **Tableau** nommé `messages` → un seul **Dictionnaire**
+      dedans, contenant deux champs Texte :
+      - `role` → `user`
+      - `content` → la consigne ci-dessous **suivie de la variable
+        Texte dicté**
 
-Texte du message `system` — il compte, parce que la réponse sera **lue
-à voix haute** et qu'un pavé de 300 mots à l'oral est insupportable :
+Texte à mettre dans `content`, avant la variable :
 
 ```
-Tu es Mob, un assistant vocal. Réponds en français, brièvement :
-une à trois phrases maximum. Pas de listes, pas de titres, pas de
-mise en forme — ta réponse sera lue à voix haute.
+Réponds en français, en une à trois phrases maximum, sans listes ni
+mise en forme — ta réponse sera lue à voix haute. Question :
 ```
+
+On glisse la consigne dans le message de l'utilisateur au lieu
+d'ajouter un second dictionnaire `role: system`. Le résultat est
+quasiment le même, et ça évite de construire deux dictionnaires
+imbriqués au doigt sur un écran de téléphone. La consigne compte : la
+réponse est **lue à voix haute**, et un pavé de 300 mots à l'oral est
+insupportable.
 
 **3. Obtenir la valeur du dictionnaire**
 - Clé : `choices`
