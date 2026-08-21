@@ -5,6 +5,13 @@ existe parce qu'elle contourne tout ce qui bloque : **pas de Xcode, pas
 de Mac, pas de signature, pas de compte développeur, pas de
 réinstallation tous les 7 jours.** Cinq minutes sur le téléphone.
 
+**Tout se fait depuis l'iPhone, du début à la fin** : créer le compte
+Mistral (Safari), créer le raccourci (app Raccourcis), le tester, et le
+déclencher. Aucun ordinateur n'est nécessaire à aucune étape. C'est le
+seul chemin vers un Mob fonctionnel qui ait cette propriété — l'app
+native, elle, ne peut pas être compilée depuis un iPhone (voir plus
+bas).
+
 La contrepartie est réelle et il faut l'avoir en tête : un raccourci ne
 peut pas faire tourner un modèle en local. Il appelle forcément un
 service en ligne. Donc Mob en raccourci a besoin d'internet, et le
@@ -96,38 +103,40 @@ Sept actions montées d'un bloc qui ne produisent rien, ça ne dit pas
 **où** c'est cassé. Ajoute-les par paliers, en vérifiant à chaque fois.
 Chaque palier isole une catégorie de panne différente.
 
-**Palier A — la clé seule, avant même d'ouvrir Raccourcis.** Dans le
-Terminal du Mac :
+Tout se fait depuis l'iPhone — aucun ordinateur n'intervient à aucun
+palier.
 
-```
-curl -X POST https://api.mistral.ai/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TA_CLÉ" \
-  -d '{"model":"mistral-small-latest","messages":[{"role":"user","content":"Dis bonjour"}]}'
-```
+**Palier A — la clé et l'appel API, 2 actions seulement.** Construis
+d'abord *uniquement* l'action **Obtenir le contenu de l'URL**
+(configurée comme à l'étape 2, mais avec une question tapée en dur dans
+`content` au lieu de la variable dictée), suivie de **Affichage
+rapide**. Lance avec ▶️.
 
-- Réponse JSON contenant une phrase → la clé et le modèle sont bons.
-- `{"detail":"Invalid API Key"}` → la clé est fausse ou tronquée.
+- Un JSON contenant une phrase → réseau, clé et corps de requête sont
+  bons. C'est l'essentiel de validé.
+- `{"detail":"Invalid API Key"}` → la clé est fausse, tronquée, ou il
+  manque `Bearer ` devant.
 
-L'adresse et le format JSON ci-dessus ont été vérifiés en conditions
-réelles (l'API répond bien `401` sur une clé bidon, donc la requête est
+L'adresse et le format JSON ont été vérifiés en conditions réelles
+(l'API répond bien `401` sur une clé bidon, donc la requête est
 correcte jusqu'à l'authentification).
 
-**Palier B — l'appel depuis le téléphone, 2 actions seulement.** Dans
-un raccourci de test : *Obtenir le contenu de l'URL* (configuré comme à
-l'étape 2, mais avec du texte tapé en dur dans `content` au lieu du
-texte dicté) → *Affichage rapide*. Tu dois voir le JSON brut de la
-réponse. Si oui : réseau, clé et corps de requête sont bons.
+**Palier B — le décodage.** Ajoute les quatre actions d'extraction,
+garde *Affichage rapide* en dernier. Tu dois maintenant voir **juste la
+phrase**, sans le JSON autour. Du vide ici = c'est l'une de ces quatre
+actions qui décroche, pas l'API.
 
-**Palier C — le décodage.** Ajoute les actions 3 à 6, garde
-*Affichage rapide* à la fin. Tu dois maintenant voir **juste la
-phrase**, sans le JSON autour. Si tu vois du vide, c'est l'une de ces
-quatre actions qui décroche.
+**Palier C — la voix.** Remplace le texte tapé en dur par *Dicter le
+texte* en tête, et *Affichage rapide* par *Énoncer le texte* en fin.
 
-**Palier D — la voix.** Remplace le texte en dur par *Dicter le texte*
-en tête, et *Affichage rapide* par *Énoncer le texte* en fin.
+**Palier D — Siri.** Dis **« Dis Siri, Mob »**, puis pose ta question.
 
-**Palier E — Siri.** Dis **« Dis Siri, Mob »**, puis pose ta question.
+*(Accessoirement, si tu as un Mac sous la main, `curl -X POST
+https://api.mistral.ai/v1/chat/completions -H "Content-Type:
+application/json" -H "Authorization: Bearer TA_CLÉ" -d
+'{"model":"mistral-small-latest","messages":[{"role":"user","content":"Dis
+bonjour"}]}'` teste la clé en dix secondes. Ce n'est qu'un confort : le
+palier A fait exactement la même vérification depuis le téléphone.)*
 
 Tu peux aussi le lancer sans la voix :
 - **Toucher au dos** : Réglages → Accessibilité → Tactile → Toucher au

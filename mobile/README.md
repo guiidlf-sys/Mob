@@ -80,9 +80,29 @@ Vérifié : compiler et signer une vraie app iOS nécessite toujours un Mac
   vrais Macs dans un datacenter, tu récupères l'app signée. C'est
   l'option réaliste si tu n'as ni Mac ni iPad — pas besoin de matériel
   Apple supplémentaire.
-- **Depuis ton iPhone seul, sans iPad ni Mac** : aucune de ces deux
-  options ne tourne entièrement sur iPhone — il faudra soit un iPad,
-  soit un service cloud, pour la partie compilation.
+- **Depuis ton iPhone seul, sans iPad ni Mac** : impossible d'y
+  compiler quoi que ce soit. Swift Playgrounds existe sur iPhone mais
+  sa fonction de création/compilation d'app est réservée à l'iPad.
+
+**Le seul chemin réellement sans ordinateur : CI + TestFlight.** Il
+existe, mais il n'est ni gratuit ni immédiat. Le principe : la CI
+(déjà en place, voir `.github/workflows/ios-build.yml`) compile **et
+signe** l'app sur un runner macOS, puis l'envoie sur TestFlight ; tu
+l'installes ensuite depuis l'app TestFlight sur ton iPhone, sans jamais
+toucher un Mac. Ça suppose :
+
+- l'abonnement Apple Developer à **99 $/an** (obligatoire pour
+  TestFlight — et de toute façon déjà nécessaire pour « Dis Siri, Mob »
+  et la mémoire iCloud, voir plus haut) ;
+- des certificats de signature et une clé d'API App Store Connect
+  stockés en secrets GitHub — mise en place fastidieuse, mais faisable
+  sans Mac ;
+- en contrepartie : plus de réinstallation tous les 7 jours (90 jours
+  sur TestFlight), et les mises à jour arrivent toutes seules.
+
+Tant que l'abonnement n'est pas pris, l'app native **exige un Mac ou un
+iPad** au moment de l'installation. Le raccourci (`shortcut/`), lui,
+n'a jamais eu besoin de rien d'autre que l'iPhone.
 
 **Comme Mob est pour ton usage personnel uniquement (toi et toi seul,
 pas de distribution)** : pas besoin de soumettre quoi que ce soit à
