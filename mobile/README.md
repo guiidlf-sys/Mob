@@ -153,24 +153,46 @@ suppose que ton PC tourne et soit joignable. `LLMEngine.swift` appelle
 `jarvis.py` : `POST /api/chat` avec `{"model", "messages", "stream":
 false}`, réponse attendue `{"message": {"content": "..."}}`.
 
-**Côté PC :**
-1. `ollama pull <modèle>` — le modèle dépend de ton GPU/VRAM, que je ne
-   connais pas encore : dis-le-moi et j'affinerai la recommandation.
-   Repères généraux : ~8 Go de VRAM → un modèle ~8B (ex. Llama 3.1 8B) ;
-   ~24 Go de VRAM → jusqu'à ~30B correctement quantifié ; il faut
-   typiquement 40 Go+ de VRAM pour un 70B en Q4 — sans GPU dédié (CPU
-   seul), reste sur du 7-8B, ce sera lent sinon.
+**Ton cas précis : MacBook Air, 8 Go de mémoire unifiée.** Pas de VRAM
+séparée sur Apple Silicon — la RAM est partagée entre macOS et le
+modèle. Avec seulement 8 Go au total (macOS + apps ouvertes en prennent
+déjà 3-5 Go), il faut rester sur un **petit modèle, ~2-4B quantifié**
+(ex. Llama 3.2 3B Instruct, Phi-3.5-mini, Qwen2.5 3B) — un 7-8B
+swappera et deviendra très lent, voire instable. Le MacBook Air n'a en
+plus pas de ventilateur : une conversation soutenue peut chauffer et
+throttler la puce.
+
+**⚠️ À relire avant d'aller plus loin :** avec cette RAM, le modèle que
+ton Mac peut tenir (~3B) n'est pas plus capable que ce que l'iPhone 17
+Pro aurait pu faire tourner **directement sur lui-même** (voir la
+recommandation on-device qu'on avait écartée). Le choix "PC
+auto-hébergé" avait du sens pour viser *plus* de capacité qu'on-device —
+sur ce Mac précis, ça n'apporte pas ce gain. Ça reste utile pour ne pas
+solliciter la batterie/le processeur du téléphone, mais si l'objectif
+premier était "le plus intelligent possible", il faut qu'on en reparle
+(API cloud payante pour les tâches qui le demandent, ou accepter ce
+plafond ~3B des deux côtés).
+
+**Côté Mac :**
+1. `ollama pull llama3.2` (ou un autre ~3B) — évite les modèles plus
+   gros vu la RAM disponible.
 2. Par défaut Ollama n'écoute que `127.0.0.1` (donc invisible depuis le
    téléphone). Pour l'ouvrir à ton réseau local : variable d'environnement
    `OLLAMA_HOST=0.0.0.0:11434` avant de lancer `ollama serve` (ou dans la
-   config du service si tu le lances via systemd/launchd).
+   config du lancement automatique si tu utilises `brew services`).
 3. **⚠️ Sécurité — ne mets jamais ça derrière une redirection de port
    ouverte sur Internet.** L'API Ollama n'a aucune authentification :
    quiconque atteint le port peut l'utiliser ou supprimer tes modèles.
    Pour un accès en dehors de ton Wi-Fi, utilise **Tailscale** (réseau
-   privé chiffré gratuit pour un usage perso) installé sur le PC et sur
-   l'iPhone — utilise alors le nom Tailscale du PC comme adresse dans
+   privé chiffré gratuit pour un usage perso) installé sur le Mac et sur
+   l'iPhone — utilise alors le nom Tailscale du Mac comme adresse dans
    les Réglages de Mob, jamais une redirection de port sur ta box.
+4. **Un MacBook (contrairement à un PC de bureau) s'endort quand tu
+   fermes l'écran** — et Mob devient injoignable pendant ce temps. Sans
+   écran externe branché, il n'y a pas de moyen officiel de désactiver
+   cette mise en veille au clapet fermé. Il faudra donc soit garder le
+   Mac ouvert et branché en permanence, soit accepter que Mob soit
+   hors-ligne quand le capot est fermé (il le dira au lieu de planter).
 
 **Côté iPhone :** ouvre Mob → ⚙️ → renseigne l'adresse et le modèle
 (étape 4 ci-dessus). Tant que rien n'est configuré, Mob répond
