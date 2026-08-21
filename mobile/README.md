@@ -137,6 +137,54 @@ Sans lui l'app compile et se lance quand même — elle affiche
 bundle » au lieu de planter, ce qui est utile pour valider que le reste
 fonctionne avant de télécharger 2 Go.
 
+## Faire compiler par Claude Code, en local sur le Mac
+
+Une session Claude Code lancée **sur le Mac** (pas dans un conteneur
+cloud) a accès au terminal, donc à `xcodebuild` — elle peut compiler,
+lire les erreurs et itérer toute seule. C'est le moyen de corriger les
+erreurs résiduelles du premier build sans faire l'aller-retour à la
+main.
+
+Prérequis : Xcode installé depuis l'App Store (compter ~40 Go de disque
+une fois les SDK dépliés — c'est du disque, pas de la RAM, donc les
+8 Go du Mac ne sont pas un problème ici), puis :
+
+```
+xcode-select --install
+sudo xcodebuild -license accept
+```
+
+**Vérifier que ça compile — sans signature, sans iPhone, sans compte
+Apple.** C'est la commande à donner en premier à Claude Code, parce
+qu'elle isole les vraies erreurs de code de tous les problèmes de
+signature :
+
+```
+cd mobile && xcodegen generate
+xcodebuild -project Mob.xcodeproj -scheme Mob \
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -derivedDataPath .build \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+Une fois que ça passe, l'installation sur ton iPhone :
+
+```
+xcodebuild -project Mob.xcodeproj -scheme Mob \
+  -destination 'generic/platform=iOS' \
+  -allowProvisioningUpdates \
+  build
+```
+
+Le `-allowProvisioningUpdates` demande à Xcode de créer le profil de
+provisioning tout seul, mais il faut que ton identifiant Apple soit
+déjà connecté dans **Xcode → Settings → Accounts** : cette étape-là
+passe par l'interface graphique, une seule fois, et aucune session
+Claude Code ne peut la faire à ta place. Pareil pour le « Faire
+confiance à ce développeur » à accepter sur l'iPhone lui-même
+(Réglages → Général → VPN et gestion de l'appareil).
+
 ## Mise en place manuelle (si tu préfères l'assistant Xcode)
 
 1. Xcode → **File → New → Project → iOS App**, nom du projet **`Mob`**

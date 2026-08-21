@@ -32,6 +32,16 @@ contexte du appelant. Épinglé sur la ligne 3.x (dernier tag v3.0.3).
 commande — c'est la voie recommandée pour le premier build, elle évite
 les réglages manuels de capacités/Info.plist. Voir `mobile/README.md`.
 
+**Si tu tournes sur le Mac de l'utilisateur** (et pas dans un conteneur
+cloud), tu as `xcodebuild` : compile, lis les erreurs, corrige, itère —
+sans lui faire l'aller-retour à la main. Commence toujours par le build
+simulateur avec `CODE_SIGNING_ALLOWED=NO` (commandes exactes dans
+`mobile/README.md`, section « Faire compiler par Claude Code ») : il
+isole les vraies erreurs de code des problèmes de signature. Deux
+étapes restent hors de ta portée et lui reviennent : connecter son
+identifiant Apple dans Xcode → Settings → Accounts, et accepter
+« Faire confiance à ce développeur » sur l'iPhone.
+
 ## État d'avancement
 
 - **Étape 1 — faite** : client Ollama minimal (`call_ollama` dans
