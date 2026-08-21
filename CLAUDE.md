@@ -57,10 +57,23 @@ erreurs de compilation, et vérifie en particulier l'API réelle du package
   qu'une fois l'étape 4 validée.
 - **Piste mobile (iPhone) — scaffold écrit, non compilé** : app SwiftUI
   dans `mobile/Mob/` qui porte les mêmes conventions (safe-eval,
-  dégradation propre, mémoire persistante) sur iOS, avec modèle tournant
-  on-device (`LLM.swift`) et déclenchement vocal via App Intents/Siri
-  (« Dis Siri, Mob »). Détails, limites et étapes de build manuelles dans
-  `mobile/README.md` — à valider sur un Mac avec Xcode avant de continuer.
+  dégradation propre) sur iOS, avec modèle tournant on-device
+  (`LLM.swift`) et déclenchement vocal via App Intents/Siri
+  (« Dis Siri, Mob »). Mémoire (`Memory.swift`) : iCloud Drive en
+  priorité (extensible avec le forfait iCloud), stockage local de
+  l'appareil en secours automatique, historique jamais tronqué sur
+  disque (seule la fenêtre envoyée au modèle est bornée). Détails,
+  limites et étapes de build manuelles dans `mobile/README.md` — à
+  valider sur un Mac (ou iPad/service de build cloud, voir README) avant
+  de continuer.
+- **Question ouverte, à trancher avec l'utilisateur avant d'avancer** :
+  l'utilisateur veut que Mob ait les capacités d'un modèle Claude "max"
+  (codage, culture générale complète) tout en restant gratuit et
+  on-device. Ce n'est pas un manque d'ingénierie mais une contrainte
+  matérielle/économique réelle — voir la conversation pour le détail des
+  options proposées (modèle on-device plus limité vs. appel à une API
+  cloud payante vs. gros modèle auto-hébergé sur un PC perso). Ne pas
+  trancher silencieusement ce compromis à la place de l'utilisateur.
 
 ## Conventions établies
 

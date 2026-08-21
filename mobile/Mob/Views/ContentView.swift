@@ -9,6 +9,17 @@ CALC(<expression>) afin que l'outil calculatrice l'exécute.
 /// resources — see mobile/README.md for model choice and licensing.
 private let modelResourceName = "mob-model"
 
+/// How much history is sent to the model as context per turn. Separate
+/// from storage retention (Memory keeps everything, see Memory.swift) —
+/// this bound exists because the model's context window is limited, not
+/// because disk space is.
+private let contextWindow = 40
+
+/// How many messages the transcript view renders at once, so a
+/// long-running conversation doesn't slow down scrolling — the full
+/// history still lives on disk regardless of this.
+private let displayedHistory = 200
+
 struct ContentView: View {
     @StateObject private var speech = SpeechRecognizer()
     @State private var engine: LLMEngine?
@@ -22,9 +33,13 @@ struct ContentView: View {
         VStack(spacing: 16) {
             Text("Mob").font(.largeTitle.bold())
 
+            Text(memory.backend == .iCloud ? "Mémoire : iCloud (extensible)" : "Mémoire : sur l'appareil")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(memory.history.enumerated()), id: \.offset) { _, entry in
+                    ForEach(Array(memory.recent(limit: displayedHistory).enumerated()), id: \.offset) { _, entry in
                         Text("\(entry.role == "user" ? "Toi" : "Mob") : \(entry.content)")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -92,7 +107,7 @@ struct ContentView: View {
             return
         }
         isThinking = true
-        let reply = await engine.respond(to: input, history: memory.history)
+        let reply = await engine.respond(to: input, history: memory.recent(limit: contextWindow))
         isThinking = false
         memory.append(role: "assistant", content: reply)
         memory.save()
