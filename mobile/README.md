@@ -109,36 +109,16 @@ Vérifié : compiler et signer une vraie app iOS nécessite toujours un Mac
    généré (glisser-déposer les dossiers `Intents/`, `Speech/`,
    `Engine/`, `Views/` et le fichier `MobApp.swift` dans le navigateur
    Xcode, en cochant "Copy items if needed").
-3. **Ajoute la dépendance SPM** : File → Add Package Dependencies →
-   `https://github.com/eastriverlee/LLM.swift` → ajoute le produit `LLM`
-   à la target `Mob`. J'ai vérifié l'API (`LLM(from:template:)`,
-   `getCompletion(from:)`) via le README du projet avant d'écrire
-   `LLMEngine.swift`, mais **vérifie-la à nouveau une fois le package
-   résolu par Xcode** (autocomplétion / erreurs de compilation) — la
-   version exacte que SPM installera peut avoir changé son API depuis.
-4. **Ajoute un modèle `.gguf`** au bundle de l'app (target Mob →
-   Build Phases → Copy Bundle Resources) sous le nom
-   `mob-model.gguf` (ou change `modelResourceName` dans
-   `ContentView.swift`). Le choix dépend du téléphone : sur un iPhone
-   d'entrée de gamme (≤6-8 Go de RAM), reste sur un petit modèle comme
-   Llama 3.2 1B Instruct ou Gemma 3 270M/1B (Q4_K_M). **Sur iPhone 17
-   Pro (A19 Pro, 12 Go de RAM, Neural Engine 16 cœurs)**, tu as la marge
-   pour un modèle nettement plus capable — vise plutôt un **Llama 3.2
-   3B Instruct** ou **Qwen2.5 3B Instruct** quantifié en Q4_K_M
-   (~2 Go), pour de meilleures réponses sans changer d'architecture.
-   Reste prudent au-delà (un 7-8B passera en mémoire mais cognera
-   contre la limite mémoire par app d'iOS — le "jetsam" — surtout avec
-   d'autres apps ouvertes en tâche de fond). Modèles en `.gguf`
-   disponibles sur Hugging Face (comptes comme `bartowski` ou
-   `ggml-org` publient des quantifications prêtes à l'emploi). Vérifie
-   la licence du modèle choisi avant diffusion.
-
-   Note pour plus tard : le Neural Engine 16 cœurs de l'A19 Pro (avec
-   accélérateurs dédiés par cœur) n'est pas exploité par `LLM.swift`
-   (backend Metal/GPU via llama.cpp) — le framework MLX d'Apple tire
-   mieux parti du Neural Engine sur ce chip. Pas un changement à faire
-   maintenant, mais une piste d'optimisation valable une fois le
-   scaffold actuel validé.
+3. Rien à ajouter côté SPM : Mob parle à ton PC en HTTP via
+   `OllamaClient.swift` (URLSession stdlib), donc pas de dépendance
+   tierce à résoudre pour le moteur IA.
+4. **Configure le serveur dans l'app** (pas dans Xcode) : une fois
+   buildée, ouvre Mob → icône ⚙️ en haut à droite → renseigne l'adresse
+   de ton PC (ex. `http://192.168.1.42:11434` sur le même Wi-Fi, ou ton
+   nom Tailscale, ex. `http://mon-pc.tailXXXX.ts.net:11434`) et le nom
+   du modèle à utiliser (ex. `llama3.1:70b`, ce que tu as déjà `pull`
+   avec Ollama). Voir la section « Backend : ton PC via Ollama »
+   ci-dessous pour le choix du modèle et la configuration côté PC.
 5. **Active la capacité Siri** : target Mob → Signing & Capabilities →
    `+ Capability` → `Siri`.
 6. **Active iCloud pour la mémoire extensible** (voir section « Mémoire »
@@ -164,6 +144,39 @@ Vérifié : compiler et signer une vraie app iOS nécessite toujours un Mac
    écouter automatiquement ; sinon il faudra le déverrouiller à la main
    d'abord (voir limite ci-dessous).
 
+## Backend : ton PC via Ollama, pas un modèle sur le téléphone
+
+Tu as choisi que Mob s'appuie sur un gros modèle auto-hébergé sur ton PC
+plutôt qu'un petit modèle embarqué dans l'app — plus capable, mais qui
+suppose que ton PC tourne et soit joignable. `LLMEngine.swift` appelle
+`OllamaClient.swift`, qui fait exactement ce que fait `call_ollama` dans
+`jarvis.py` : `POST /api/chat` avec `{"model", "messages", "stream":
+false}`, réponse attendue `{"message": {"content": "..."}}`.
+
+**Côté PC :**
+1. `ollama pull <modèle>` — le modèle dépend de ton GPU/VRAM, que je ne
+   connais pas encore : dis-le-moi et j'affinerai la recommandation.
+   Repères généraux : ~8 Go de VRAM → un modèle ~8B (ex. Llama 3.1 8B) ;
+   ~24 Go de VRAM → jusqu'à ~30B correctement quantifié ; il faut
+   typiquement 40 Go+ de VRAM pour un 70B en Q4 — sans GPU dédié (CPU
+   seul), reste sur du 7-8B, ce sera lent sinon.
+2. Par défaut Ollama n'écoute que `127.0.0.1` (donc invisible depuis le
+   téléphone). Pour l'ouvrir à ton réseau local : variable d'environnement
+   `OLLAMA_HOST=0.0.0.0:11434` avant de lancer `ollama serve` (ou dans la
+   config du service si tu le lances via systemd/launchd).
+3. **⚠️ Sécurité — ne mets jamais ça derrière une redirection de port
+   ouverte sur Internet.** L'API Ollama n'a aucune authentification :
+   quiconque atteint le port peut l'utiliser ou supprimer tes modèles.
+   Pour un accès en dehors de ton Wi-Fi, utilise **Tailscale** (réseau
+   privé chiffré gratuit pour un usage perso) installé sur le PC et sur
+   l'iPhone — utilise alors le nom Tailscale du PC comme adresse dans
+   les Réglages de Mob, jamais une redirection de port sur ta box.
+
+**Côté iPhone :** ouvre Mob → ⚙️ → renseigne l'adresse et le modèle
+(étape 4 ci-dessus). Tant que rien n'est configuré, Mob répond
+"Mob est hors-ligne : aucun serveur configuré (Réglages)" au lieu de
+planter.
+
 ## Mémoire : iCloud en priorité, appareil en secours
 
 `Memory.swift` essaie d'abord d'écrire dans **iCloud Drive** (conteneur
@@ -183,7 +196,7 @@ disque (contrairement à `memory.py` côté Python, qui garde sa limite à
 40 messages et n'a pas été modifié). Seul ce qui est envoyé au modèle à
 chaque tour est borné (`contextWindow` dans `ContentView.swift`, 40 par
 défaut) — parce que la fenêtre de contexte d'un modèle est une limite
-different du stockage : même avec un espace illimité, le modèle ne peut
+différente du stockage : même avec un espace illimité, le modèle ne peut
 "lire" qu'une quantité bornée de texte par requête.
 
 Nécessite la capacité iCloud Documents activée dans Xcode (étape 6
@@ -201,9 +214,12 @@ ci-dessous) pour que le tier iCloud soit seulement *disponible* — sans
   déverrouillage (Face ID ou code) avant d'ouvrir l'app — ce n'est pas
   contournable via `authenticationPolicy`. Quasi invisible si Face ID te
   voit en sortant le téléphone, sinon il faut taper le code à la main.
-- Premier chargement du modèle plus lent (décompression/allocation du
-  `.gguf`) ; l'inférence on-device consomme batterie et chauffe le
-  téléphone sur les modèles plus gros.
+- Mob a besoin que ton PC soit **allumé, Ollama lancé, et joignable**
+  (Wi-Fi local ou Tailscale) — pas de mode hors-ligne autonome avec ce
+  choix d'architecture ; si le PC est éteint ou injoignable, Mob répond
+  "hors-ligne" au lieu de planter, mais ne répond pas.
+- Latence réseau + temps d'inférence d'un gros modèle : les réponses ne
+  seront pas instantanées, surtout via Tailscale depuis l'extérieur.
 - Locale vocale codée en dur en `fr-FR` dans `SpeechRecognizer.swift`
   et `Speaker.swift` — change-la si besoin.
 - `StartMobIntent`/`MobShortcuts` n'ont pas pu être compilés ni testés

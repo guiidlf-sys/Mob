@@ -31,10 +31,11 @@ en conditions réelles** :
 
 Même chose côté mobile : le code Swift dans `mobile/Mob/` n'a **jamais été
 compilé** (cet environnement de travail est un conteneur Linux sans Xcode).
-Avant d'avancer sur ce chantier, ouvre-le dans Xcode sur un Mac, corrige les
-erreurs de compilation, et vérifie en particulier l'API réelle du package
-`LLM.swift` une fois résolu par Swift Package Manager (voir
-`mobile/README.md`, section « Limites connues »).
+Avant d'avancer sur ce chantier, ouvre-le dans Xcode (ou via Swift
+Playgrounds/iPad, ou un service de build cloud — voir `mobile/README.md`),
+corrige les erreurs de compilation, et vérifie que `OllamaClient.swift`
+tape bien la même forme de requête/réponse que ton vrai serveur Ollama
+(même vérification que côté Python, section ci-dessus).
 
 ## État d'avancement
 
@@ -57,23 +58,32 @@ erreurs de compilation, et vérifie en particulier l'API réelle du package
   qu'une fois l'étape 4 validée.
 - **Piste mobile (iPhone) — scaffold écrit, non compilé** : app SwiftUI
   dans `mobile/Mob/` qui porte les mêmes conventions (safe-eval,
-  dégradation propre) sur iOS, avec modèle tournant on-device
-  (`LLM.swift`) et déclenchement vocal via App Intents/Siri
-  (« Dis Siri, Mob »). Mémoire (`Memory.swift`) : iCloud Drive en
-  priorité (extensible avec le forfait iCloud), stockage local de
-  l'appareil en secours automatique, historique jamais tronqué sur
-  disque (seule la fenêtre envoyée au modèle est bornée). Détails,
-  limites et étapes de build manuelles dans `mobile/README.md` — à
-  valider sur un Mac (ou iPad/service de build cloud, voir README) avant
-  de continuer.
-- **Question ouverte, à trancher avec l'utilisateur avant d'avancer** :
-  l'utilisateur veut que Mob ait les capacités d'un modèle Claude "max"
-  (codage, culture générale complète) tout en restant gratuit et
-  on-device. Ce n'est pas un manque d'ingénierie mais une contrainte
-  matérielle/économique réelle — voir la conversation pour le détail des
-  options proposées (modèle on-device plus limité vs. appel à une API
-  cloud payante vs. gros modèle auto-hébergé sur un PC perso). Ne pas
-  trancher silencieusement ce compromis à la place de l'utilisateur.
+  dégradation propre) sur iOS, et déclenchement vocal via App
+  Intents/Siri (« Dis Siri, Mob »). **Backend IA : le PC de
+  l'utilisateur via Ollama** (`OllamaClient.swift`/`LLMEngine.swift`),
+  pas un modèle embarqué sur le téléphone — choix explicite de
+  l'utilisateur (voir ci-dessous) pour avoir un modèle bien plus
+  capable qu'un modèle taille-téléphone. Adresse/modèle du serveur
+  configurables dans l'app (⚙️, `MobSettings.swift`, persisté en
+  `UserDefaults`) puisque c'est propre au réseau de l'utilisateur.
+  Mémoire (`Memory.swift`) : iCloud Drive en priorité (extensible avec
+  le forfait iCloud), stockage local de l'appareil en secours
+  automatique, historique jamais tronqué sur disque (seule la fenêtre
+  envoyée au modèle est bornée). Détails, limites, sécurité réseau
+  (Tailscale plutôt qu'un port ouvert sur Internet) et étapes de build
+  manuelles dans `mobile/README.md` — à valider sur un Mac (ou
+  iPad/service de build cloud, voir README) avant de continuer.
+- **Décision tranchée avec l'utilisateur** : Mob ne peut pas avoir les
+  capacités du Claude le plus cher tout en étant gratuit et on-device —
+  contrainte matérielle/économique réelle, pas un manque d'ingénierie
+  (aucun modèle de ce calibre ne tient sur un téléphone). Options
+  posées : petit modèle on-device / API cloud payante / gros modèle
+  auto-hébergé sur le PC perso / hybride. L'utilisateur a choisi
+  **le PC perso auto-hébergé**, d'où le changement d'architecture
+  ci-dessus. Reste à préciser : le GPU/VRAM du PC de l'utilisateur (pas
+  encore connu), nécessaire pour recommander une taille de modèle
+  réaliste — voir `mobile/README.md`, section « Backend : ton PC via
+  Ollama ».
 
 ## Conventions établies
 
@@ -90,10 +100,10 @@ erreurs de compilation, et vérifie en particulier l'API réelle du package
   pour éviter un décalage de version. Si tu ajoutes une dépendance tierce
   (le paquet `ollama`, `requests`, etc.), vérifie sa signature réelle
   installée avant de coder contre elle — ne suppose jamais une API à
-  partir de la documentation seule. Même règle côté Swift : l'API de
-  `LLM.swift` utilisée dans `LLMEngine.swift` a été vérifiée via le
-  README du projet, pas testée en conditions réelles — reconfirme-la
-  une fois le package résolu par Xcode.
+  partir de la documentation seule. Même règle côté Swift :
+  `OllamaClient.swift` suppose le même schéma de requête/réponse que
+  `call_ollama` en Python, jamais testé contre un vrai serveur — à
+  reconfirmer une fois compilé.
 
 ## Setup
 
