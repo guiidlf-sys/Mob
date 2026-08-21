@@ -15,10 +15,28 @@ mais Ollama et le code testé sont réels — si tu relances cette validation su
 la machine réelle de l'utilisateur, considère-la comme une reconfirmation,
 pas comme un prérequis bloquant avant l'étape 4.
 
-Côté mobile en revanche, le code Swift dans `mobile/Mob/` n'a **jamais été
-compilé** (cet environnement de travail est un conteneur Linux sans Xcode,
-et aucune session Claude Code ne peut ouvrir Xcode sur la machine de
-l'utilisateur — c'est lui qui doit lancer le build).
+## ✅ L'app iOS compile — vérifié en CI
+
+`.github/workflows/ios-build.yml` compile l'app sur un runner macOS de
+GitHub (XcodeGen + `xcodebuild`, destination simulateur,
+`CODE_SIGNING_ALLOWED=NO`) : **build vert**. C'est le moyen de valider le
+code Swift sans Mac — utilise-le à chaque changement dans `mobile/` plutôt
+que de deviner. Deux choses apprises en le mettant en place :
+
+- `-skipMacroValidation` est **obligatoire** : `LLM.swift` embarque des
+  macros Swift, et sans ce drapeau le build meurt sur « Macro
+  LLMMacrosImplementation ... must be enabled ». En interface graphique
+  Xcode montre une boîte « Trust & Enable » à la place.
+- Le pin `from: "3.0.3"` résout bien (LLM.swift 3.0.3 + swift-syntax
+  602.0.0).
+
+Ce qui reste hors de portée d'une session : **signer et installer sur
+l'iPhone**. Ça exige un certificat lié à l'identifiant Apple de
+l'utilisateur — ni un conteneur cloud ni la CI ne peuvent le faire, et
+accepter les contrats Apple à sa place n'est pas acceptable. Restent à
+lui : connecter son identifiant Apple dans Xcode → Settings → Accounts,
+choisir l'équipe dans Signing & Capabilities, et accepter « Faire
+confiance à ce développeur » sur l'iPhone.
 
 L'API de `LLM.swift` a été vérifiée contre le **code source réel** du
 package (pas seulement son README) : `Role` est un enum au niveau du
@@ -72,6 +90,15 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   fenêtre envoyée au modèle est bornée). Détails, limites et étapes de
   build manuelles dans `mobile/README.md` — à valider sur un Mac (ou
   iPad/service de build cloud, voir README) avant de continuer.
+- **Piste raccourci Siri — `shortcut/README.md`, choisie en parallèle de
+  l'app** : un raccourci iOS nommé `Mob` (dictée → API Mistral, palier
+  gratuit → énoncé vocal). Elle existe parce qu'elle contourne tout le
+  parcours Xcode/signature/réinstallation-7-jours, et parce que Siri
+  lance un raccourci **par son nom seul** — donc « Dis Siri, Mob » y est
+  plus propre que via les App Intents. Contrepartie assumée : pas de
+  modèle local, donc pas hors-ligne et pas privé ; ni mémoire ni
+  safe-eval dans la v1. Ce n'est **pas** un abandon de l'app native :
+  l'utilisateur a explicitement choisi de mener les deux.
 - **Décision backend — tranchée avec l'utilisateur, ne pas rouvrir sans
   lui en reparler** : Mob ne peut pas avoir les capacités du Claude le
   plus cher tout en étant gratuit et on-device — contrainte
