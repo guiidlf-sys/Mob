@@ -30,6 +30,22 @@ que de deviner. Deux choses apprises en le mettant en place :
 - Le pin `from: "3.0.3"` résout bien (LLM.swift 3.0.3 + swift-syntax
   602.0.0).
 
+**⚠️ Limite de compte, découverte après coup et déterminante pour cette
+piste** : un compte Apple **gratuit** (« Personal Team ») n'a droit ni à
+la capacité **iCloud** ni à la capacité **Siri**. Sans l'autorisation
+`com.apple.developer.siri`, l'App Intent apparaît dans l'app Raccourcis
+mais **Siri refuse de le déclencher à la voix, silencieusement**. Donc
+avec un compte gratuit : pas de « Dis Siri, Mob », pas de mémoire
+iCloud (repli automatique sur l'appareil), et réinstallation tous les
+7 jours. Le déclenchement vocal natif coûte 99 $/an. Il faut alors
+retirer le bloc `entitlements:` de `project.yml`, sinon la signature
+échoue — voir `mobile/README.md`. C'est la raison principale pour
+laquelle la piste raccourci (`shortcut/README.md`) n'est pas un
+pis-aller : elle obtient le déclenchement vocal gratuitement.
+
+Les comptes Apple du Mac et de l'iPhone peuvent être **différents**,
+ça ne bloque ni la compilation ni l'installation.
+
 Ce qui reste hors de portée d'une session : **signer et installer sur
 l'iPhone**. Ça exige un certificat lié à l'identifiant Apple de
 l'utilisateur — ni un conteneur cloud ni la CI ne peuvent le faire, et

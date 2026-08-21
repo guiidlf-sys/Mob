@@ -96,6 +96,62 @@ relancer un build tous les 7 jours pour renouveler la signature — le
 compte développeur payant (99$/an) sert uniquement à éviter cette
 corvée de réinstallation, pas à publier quoi que ce soit.
 
+## ⚠️ Compte Apple gratuit : ce qui ne marchera pas
+
+Vérifié avant de s'engager plus loin, parce que ça change la valeur de
+toute cette piste. Un **compte Apple gratuit** (« Personal Team ») n'a
+pas droit aux capacités qui exigent des autorisations spéciales —
+notamment **iCloud** et **Siri**.
+
+Conséquences pour Mob, avec un compte gratuit :
+
+| Fonction | Compte gratuit | Compte payant (99 $/an) |
+|---|---|---|
+| Compiler et installer sur son iPhone | ✅ | ✅ |
+| Durée de vie de l'installation | 7 jours | 1 an |
+| « Dis Siri, Mob » | ❌ | ✅ |
+| Mémoire iCloud (extensible, synchronisée) | ❌ (repli sur l'appareil) | ✅ |
+| Modèle on-device, safe-eval, mémoire locale | ✅ | ✅ |
+
+Le point qui fait mal est le déclenchement vocal. Sans l'autorisation
+`com.apple.developer.siri`, l'App Intent **apparaît bien dans l'app
+Raccourcis, mais Siri refuse de le déclencher à la voix — en silence,
+sans message d'erreur**. C'est le piège classique : on croit à un bug
+de code alors que c'est une limite de compte.
+
+**Si tu restes sur un compte gratuit**, il faut retirer les deux
+capacités de `project.yml`, sinon la signature échouera : supprime le
+bloc `entitlements:` en entier, puis relance `xcodegen generate`.
+`Memory.swift` bascule alors tout seul sur le stockage de l'appareil
+(c'est prévu, pas un contournement).
+
+**Piste à tester pour récupérer la voix sans payer** — raisonnement,
+pas fait vérifié : puisque l'App Intent reste visible dans l'app
+Raccourcis même sans l'autorisation, on devrait pouvoir créer un
+raccourci nommé `Mob` qui ne fait qu'appeler cet intent. Siri lance un
+raccourci **par son nom seul**, sans autorisation particulière — donc
+« Dis Siri, Mob » passerait par le raccourci pour atteindre l'app. À
+essayer une fois l'app installée.
+
+Cette limite est aussi la meilleure raison de commencer par
+`shortcut/README.md` : un raccourci pur n'a besoin d'aucun compte
+développeur, ne périme pas au bout de 7 jours, et son déclenchement
+vocal fonctionne gratuitement.
+
+## Deux comptes Apple différents (Mac et iPhone)
+
+Ça ne bloque pas. Xcode signe avec le compte connecté **sur le Mac** ;
+l'iPhone peut être connecté à un tout autre compte iCloud. Le téléphone
+demande juste de faire confiance au certificat du développeur
+(Réglages → Général → VPN et gestion de l'appareil), qui affichera
+l'adresse du compte utilisé dans Xcode.
+
+À retenir quand même : si tu prends un jour l'abonnement à 99 $/an,
+c'est le **compte du Mac** (celui de Xcode) qu'il faut abonner, pas
+celui de l'iPhone. Et la mémoire iCloud de l'app utiliserait alors le
+compte iCloud **de l'iPhone** — deux comptes différents pour deux rôles
+différents, ce qui fonctionne mais mérite d'être noté avant de payer.
+
 ## Prérequis
 
 - Un **Mac avec Xcode 15+** (le chemin le plus direct — voir alternatives
