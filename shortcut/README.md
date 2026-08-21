@@ -48,6 +48,19 @@ Ajoute ces actions dans l'ordre :
 - « Arrêter d'écouter » : *Après une pause*
 
 **2. Obtenir le contenu de l'URL**
+
+⚠️ **Deux pièges dès l'ajout de cette action** — les deux ont été
+rencontrés pour de vrai :
+
+1. **Raccourcis glisse tout seul la variable « Texte dicté » dans le
+   champ URL.** L'app enchaîne systématiquement la sortie de l'action
+   précédente dans l'entrée de la suivante. Il faut **la supprimer** :
+   place le curseur juste après la pastille bleue, puis ⌫. Cette
+   variable servira plus bas, dans le champ `content` — pas ici.
+2. **La ligne « Corps de la requête » n'existe pas tant que la méthode
+   est `GET`.** Elle n'apparaît qu'une fois passé en `POST`. Si tu ne
+   la trouves pas, c'est presque toujours ça.
+
 - URL : `https://api.mistral.ai/v1/chat/completions`
 - Déplie **Afficher plus** :
   - **Méthode** : `POST`
