@@ -15,10 +15,10 @@ Apple App Intents et des retours de développeurs, pas deviné).
 et App Shortcuts d'Apple exige que chaque phrase d'invocation contienne
 le nom de l'app. Résultat : dire **"Dis Siri, Mob"** (ou "Hey Siri, Mob"
 en anglais) déclenche l'app automatiquement, où qu'on soit, tant que
-Siri est activé sur le téléphone — sans toucher l'écran. C'est
-l'équivalent le plus proche possible de ta demande sur iOS stock (sans
-jailbreak, que je ne recommande pas : ça sort de l'App Store, casse les
-mises à jour et affaiblit la sécurité du téléphone).
+Siri est activé sur le téléphone. C'est l'équivalent le plus proche
+possible de ta demande sur iOS stock (sans jailbreak, que je ne
+recommande pas : ça sort de l'App Store, casse les mises à jour et
+affaiblit la sécurité du téléphone).
 
 Contrepartie technique : l'app s'ouvre brièvement (`openAppWhenRun =
 true` dans `StartMobIntent`) au lieu de rester invisible — faire tourner
@@ -27,6 +27,18 @@ un modèle de langage on-device depuis l'extension Siri en arrière-plan
 mémoire/temps trop strictes pour de l'inférence LLM. Dès l'ouverture,
 `ContentView` se met à écouter automatiquement, donc l'expérience reste
 "je dis Mob, puis je parle."
+
+**⚠️ Correction : le téléphone doit être déverrouillé.** Parce que
+`openAppWhenRun = true` amène l'app au premier plan, iOS exige un
+déverrouillage (Face ID ou code) avant de l'ouvrir — ouvrir une app au
+premier plan donne accès aux données protégées par le verrouillage, et
+le système l'impose quel que soit le contenu de l'intent
+(`authenticationPolicy` ne change rien ici, vérifié via les forums
+développeurs Apple). Concrètement : téléphone verrouillé + Face ID qui
+te reconnaît d'un coup d'œil → quasi invisible ; téléphone à plat ou en
+poche → il faut le sortir et taper le code avant que Mob n'écoute. Ce
+n'est donc pas "sans toucher l'écran" dans tous les cas — seulement
+quand le téléphone est déjà déverrouillé ou que Face ID te voit.
 
 ## Prérequis
 
@@ -74,13 +86,24 @@ mémoire/temps trop strictes pour de l'inférence LLM. Dès l'ouverture,
 7. Signe l'app avec ton identifiant Apple (Signing & Capabilities →
    Team), branche ton iPhone, build & run dessus.
 8. Sur l'iPhone : Réglages → Siri et recherche → vérifie que "Dis Siri"
-   est activé et entraîné. Dis **"Dis Siri, Mob"** — l'app doit
-   s'ouvrir et commencer à écouter automatiquement.
+   est activé et entraîné, et que "Autoriser Siri verrouillé" l'est
+   aussi si tu veux que ça marche écran éteint. Dis **"Dis Siri, Mob"**
+   — si le téléphone est déjà déverrouillé (ou que Face ID te reconnaît
+   au moment où tu le sors de ta poche), l'app s'ouvre et commence à
+   écouter automatiquement ; sinon il faudra le déverrouiller à la main
+   d'abord (voir limite ci-dessous).
 
 ## Limites connues à garder en tête
 
 - Pas de vrai mot de réveil invisible en permanence (restriction iOS,
   voir plus haut) — le déclenchement passe toujours par "Dis Siri".
+- **Téléphone éteint = rien ne fonctionne**, aucun assistant vocal ne
+  peut tourner sans que l'appareil soit allumé.
+- **Déverrouillage requis si le téléphone est verrouillé** : parce que
+  `StartMobIntent` a `openAppWhenRun = true`, iOS impose un
+  déverrouillage (Face ID ou code) avant d'ouvrir l'app — ce n'est pas
+  contournable via `authenticationPolicy`. Quasi invisible si Face ID te
+  voit en sortant le téléphone, sinon il faut taper le code à la main.
 - Premier chargement du modèle plus lent (décompression/allocation du
   `.gguf`) ; l'inférence on-device consomme batterie et chauffe le
   téléphone sur les modèles plus gros.
