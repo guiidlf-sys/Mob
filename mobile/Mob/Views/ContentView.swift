@@ -1,10 +1,13 @@
 import SwiftUI
 
 private let systemPrompt = """
-Tu es Mob, un assistant utile qui tourne sur le PC de l'utilisateur. \
-Pour un calcul, réponds avec CALC(<expression>) afin que l'outil \
-calculatrice l'exécute.
+Tu es Mob, un assistant local et utile. Pour un calcul, réponds avec \
+CALC(<expression>) afin que l'outil calculatrice l'exécute.
 """
+
+/// The name of the .gguf file added to the Xcode target's bundle
+/// resources — see mobile/README.md for model choice and licensing.
+private let modelResourceName = "mob-model"
 
 /// How much history is sent to the model as context per turn. Separate
 /// from storage retention (Memory keeps everything, see Memory.swift) —
@@ -24,20 +27,11 @@ struct ContentView: View {
     @State private var memory = Memory()
     @State private var isThinking = false
     @State private var lastReply = ""
-    @State private var showingSettings = false
     private let speaker = Speaker()
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Text("Mob").font(.largeTitle.bold())
-                Spacer()
-                Button {
-                    showingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-            }
+            Text("Mob").font(.largeTitle.bold())
 
             Text(memory.backend == .iCloud ? "Mémoire : iCloud (extensible)" : "Mémoire : sur l'appareil")
                 .font(.caption)
@@ -82,14 +76,11 @@ struct ContentView: View {
             speech.transcript = ""
             Task { await handle(input) }
         }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(onSave: loadEngine)
-        }
     }
 
     private func loadEngine() {
         do {
-            engine = try LLMEngine(systemPrompt: systemPrompt)
+            engine = try LLMEngine(modelResourceName: modelResourceName, systemPrompt: systemPrompt)
             engineError = nil
         } catch {
             engine = nil

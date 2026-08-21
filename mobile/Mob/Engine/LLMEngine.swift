@@ -1,56 +1,50 @@
 import Foundation
+import LLM
 
-/// Thrown when Mob can't reach the user's PC or gets an odd reply, so the
-/// caller can degrade gracefully instead of crashing — same convention as
-/// OllamaUnavailableError in jarvis.py.
+/// Thrown when the on-device model can't be loaded or queried, so the
+/// caller can degrade gracefully instead of crashing — same convention
+/// as OllamaUnavailableError in jarvis.py.
 enum MobEngineError: Error, LocalizedError {
-    case serverNotConfigured
-    case serverUnreachable(String, String)
-    case unexpectedResponse(String)
+    case modelNotBundled(String)
+    case modelFailedToLoad
 
     var errorDescription: String? {
         switch self {
-        case .serverNotConfigured:
-            return "aucun serveur configuré (Réglages)"
-        case .serverUnreachable(let url, let reason):
-            return "impossible de joindre \(url) : \(reason)"
-        case .unexpectedResponse(let detail):
-            return detail
+        case .modelNotBundled(let name):
+            return "model file \(name) is not in the app bundle"
+        case .modelFailedToLoad:
+            return "the on-device model failed to load"
         }
     }
 }
 
-/// Runs Mob's reasoning on the user's own PC (over the network) rather
-/// than on the phone — chosen over on-device inference so Mob can run a
-/// genuinely capable open model instead of a phone-sized one. See
-/// mobile/README.md for reachability (local Wi-Fi vs Tailscale) and
-/// model choice.
+/// Wraps LLM.swift (https://github.com/eastriverlee/LLM.swift), which loads
+/// a local .gguf file and runs inference on-device via llama.cpp. Verified
+/// against the package's published README before writing this: `LLM(from:template:)`
+/// to construct, `await bot.getCompletion(from:)` for a one-shot response.
 final class LLMEngine {
-    private let client: OllamaClient
-    private let systemPrompt: String
+    private let bot: LLM
 
-    init(systemPrompt: String) throws {
-        guard let serverURL = MobSettings.serverURL else {
-            throw MobEngineError.serverNotConfigured
+    /// - Parameter modelResourceName: the .gguf file name (without extension)
+    ///   added to the Xcode project's "Copy Bundle Resources" build phase.
+    init(modelResourceName: String, systemPrompt: String) throws {
+        guard let modelURL = Bundle.main.url(forResource: modelResourceName, withExtension: "gguf") else {
+            throw MobEngineError.modelNotBundled("\(modelResourceName).gguf")
         }
-        self.client = OllamaClient(baseURL: serverURL, model: MobSettings.model)
-        self.systemPrompt = systemPrompt
+        guard let bot = LLM(from: modelURL, template: .chatML(systemPrompt)) else {
+            throw MobEngineError.modelFailedToLoad
+        }
+        self.bot = bot
     }
 
-    /// Runs one turn against the PC's Ollama server and resolves any
-    /// CALC(...) tool call. Never throws — a reachability or shape error
-    /// becomes an inline "offline" reply, same as jarvis.py's chat_turn.
+    /// Runs one turn: sends `history + input` to the on-device model and
+    /// returns its reply with any CALC(...) tool call resolved via SafeEval.
     func respond(to input: String, history: [MemoryEntry]) async -> String {
-        var messages = [OllamaMessage(role: "system", content: systemPrompt)]
-        messages += history.map { OllamaMessage(role: $0.role, content: $0.content) }
-        messages.append(OllamaMessage(role: "user", content: input))
-
-        do {
-            let raw = try await client.chat(messages: messages)
-            return Self.resolveToolCalls(in: raw)
-        } catch {
-            return "Mob est hors-ligne : \(error.localizedDescription)"
+        bot.history = history.map { entry in
+            (role: entry.role == "user" ? LLM.Role.user : LLM.Role.bot, content: entry.content)
         }
+        let raw = await bot.getCompletion(from: input)
+        return Self.resolveToolCalls(in: raw)
     }
 
     /// Same CALC(<expression>) convention as jarvis.py's maybe_run_tool.
