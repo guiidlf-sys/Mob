@@ -29,6 +29,13 @@ en conditions réelles** :
 5. Ne construis l'étape 4 (voir plus bas) qu'une fois cette validation faite
    et les éventuels écarts corrigés.
 
+Même chose côté mobile : le code Swift dans `mobile/Mob/` n'a **jamais été
+compilé** (cet environnement de travail est un conteneur Linux sans Xcode).
+Avant d'avancer sur ce chantier, ouvre-le dans Xcode sur un Mac, corrige les
+erreurs de compilation, et vérifie en particulier l'API réelle du package
+`LLM.swift` une fois résolu par Swift Package Manager (voir
+`mobile/README.md`, section « Limites connues »).
+
 ## État d'avancement
 
 - **Étape 1 — faite** : client Ollama minimal (`call_ollama` dans
@@ -48,6 +55,12 @@ en conditions réelles** :
 - **Étape 5 — à faire** : orchestration multi-outils (au-delà de la seule
   calculatrice — ex. lecture de fichier, recherche web), à ne démarrer
   qu'une fois l'étape 4 validée.
+- **Piste mobile (iPhone) — scaffold écrit, non compilé** : app SwiftUI
+  dans `mobile/Mob/` qui porte les mêmes conventions (safe-eval,
+  dégradation propre, mémoire persistante) sur iOS, avec modèle tournant
+  on-device (`LLM.swift`) et déclenchement vocal via App Intents/Siri
+  (« Dis Siri, Mob »). Détails, limites et étapes de build manuelles dans
+  `mobile/README.md` — à valider sur un Mac avec Xcode avant de continuer.
 
 ## Conventions établies
 
@@ -64,7 +77,10 @@ en conditions réelles** :
   pour éviter un décalage de version. Si tu ajoutes une dépendance tierce
   (le paquet `ollama`, `requests`, etc.), vérifie sa signature réelle
   installée avant de coder contre elle — ne suppose jamais une API à
-  partir de la documentation seule.
+  partir de la documentation seule. Même règle côté Swift : l'API de
+  `LLM.swift` utilisée dans `LLMEngine.swift` a été vérifiée via le
+  README du projet, pas testée en conditions réelles — reconfirme-la
+  une fois le package résolu par Xcode.
 
 ## Setup
 
