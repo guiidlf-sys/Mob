@@ -24,10 +24,12 @@ struct ContentView: View {
     @StateObject private var speech = SpeechRecognizer()
     @State private var engine: LLMEngine?
     @State private var engineError: String?
-    @State private var memory = Memory()
+    @StateObject private var memory = Memory()
     @State private var isThinking = false
-    @State private var lastReply = ""
-    private let speaker = Speaker()
+    /// @State, not a plain `let`: SwiftUI re-creates the View struct on
+    /// every redraw, and a fresh Speaker each time can deallocate the
+    /// AVSpeechSynthesizer mid-utterance and cut Mob off mid-sentence.
+    @State private var speaker = Speaker()
 
     var body: some View {
         VStack(spacing: 16) {
@@ -80,7 +82,11 @@ struct ContentView: View {
 
     private func loadEngine() {
         do {
-            engine = try LLMEngine(modelResourceName: modelResourceName, systemPrompt: systemPrompt)
+            engine = try LLMEngine(
+                modelResourceName: modelResourceName,
+                systemPrompt: systemPrompt,
+                historyLimit: contextWindow
+            )
             engineError = nil
         } catch {
             engine = nil
@@ -102,7 +108,6 @@ struct ContentView: View {
             let reply = "Mob est hors-ligne : \(engineError ?? "modèle indisponible")"
             memory.append(role: "assistant", content: reply)
             memory.save()
-            lastReply = reply
             speaker.speak(reply)
             return
         }
@@ -111,7 +116,6 @@ struct ContentView: View {
         isThinking = false
         memory.append(role: "assistant", content: reply)
         memory.save()
-        lastReply = reply
         speaker.speak(reply)
     }
 }

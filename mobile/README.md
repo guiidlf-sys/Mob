@@ -109,7 +109,35 @@ corvée de réinstallation, pas à publier quoi que ce soit.
 - Un iPhone physique pour tester : le simulateur ne gère pas Siri ni le
   micro de façon réaliste.
 
-## Mise en place (à faire dans Xcode, sur le Mac)
+## Voie rapide : générer le projet en une commande (recommandé)
+
+`project.yml` décrit tout le projet Xcode (dépendance SPM, capacités
+Siri et iCloud, clés `Info.plist`, cible iOS 17, iPhone only). Plutôt
+que de refaire tout ça à la main dans l'assistant Xcode :
+
+```
+brew install xcodegen
+cd mobile
+xcodegen generate
+open Mob.xcodeproj
+```
+
+Avant le premier build, **une seule chose à changer** : dans
+`project.yml`, remplace `com.example.Mob` par un identifiant à toi
+(ex. `com.tonnom.Mob`) **aux trois endroits** (`PRODUCT_BUNDLE_IDENTIFIER`
+et les deux `iCloud.com.example.Mob`), puis relance `xcodegen generate`.
+Ensuite dans Xcode : onglet **Signing & Capabilities** → choisis ton
+équipe (ton identifiant Apple) → branche l'iPhone → **Run**.
+
+Le modèle `.gguf` n'est pas dans le dépôt (~2 Go, exclu par
+`.gitignore`) : télécharge-le et dépose-le dans `mobile/Mob/` sous le
+nom `mob-model.gguf` (voir étape 4 ci-dessous pour le choix du modèle).
+Sans lui l'app compile et se lance quand même — elle affiche
+« Mob est hors-ligne : model file mob-model.gguf is not in the app
+bundle » au lieu de planter, ce qui est utile pour valider que le reste
+fonctionne avant de télécharger 2 Go.
+
+## Mise en place manuelle (si tu préfères l'assistant Xcode)
 
 1. Xcode → **File → New → Project → iOS App**, nom du projet **`Mob`**
    (important : c'est ce nom qui sert de phrase d'invocation Siri),
@@ -227,10 +255,26 @@ ci-dessous) pour que le tier iCloud soit seulement *disponible* — sans
   pour du texte simple et un peu de code basique, pas un niveau Claude.
 - Locale vocale codée en dur en `fr-FR` dans `SpeechRecognizer.swift`
   et `Speaker.swift` — change-la si besoin.
-- `StartMobIntent`/`MobShortcuts` n'ont pas pu être compilés ni testés
-  dans cet environnement (pas d'Xcode/macOS ici) : à valider en premier
-  sur ta machine, avant d'aller plus loin, exactement comme pour la
-  validation Ollama réelle documentée dans le `CLAUDE.md` racine.
+- **Rien de ce code Swift n'a été compilé** (pas d'Xcode/macOS dans
+  l'environnement où il a été écrit). Il a en revanche été relu ligne à
+  ligne contre le **code source réel** de `LLM.swift` (pas seulement son
+  README), ce qui a déjà corrigé quatre défauts qui auraient cassé ou
+  faussé le premier build :
+  1. `Role` est un enum **au niveau du module**, pas `LLM.Role` —
+     erreur de compilation franche.
+  2. `LLM.swift` impose son propre `historyLimit: Int = 8`, qui
+     ramenait silencieusement la fenêtre de contexte de 40 à 8 :
+     désormais passé explicitement.
+  3. `Memory` était une classe simple derrière `@State` — SwiftUI ne
+     se redessinait jamais, donc la conversation serait restée
+     invisible à l'écran. Passée en `ObservableObject`/`@StateObject`.
+  4. `Speaker` était recréé à chaque redessin de la vue, ce qui pouvait
+     désallouer `AVSpeechSynthesizer` en pleine phrase et couper Mob au
+     milieu d'un mot. Retenu via `@State`.
+
+  Attends-toi quand même à quelques erreurs résiduelles au premier
+  build : une relecture, même minutieuse, ne remplace pas un
+  compilateur. Note-les et on les corrige.
 - "Illimité" reste borné par la réalité : ton forfait iCloud a une
   taille, et le stockage de secours sur l'appareil a la taille du
   téléphone. Aucun système ne stocke vraiment à l'infini — l'objectif

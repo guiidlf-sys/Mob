@@ -15,14 +15,14 @@ final class SpeechRecognizer: ObservableObject {
     private let audioEngine = AVAudioEngine()
 
     func requestAuthorization() async -> Bool {
-        let speechStatus = await withCheckedContinuation { continuation in
+        let speechStatus = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status)
             }
         }
         guard speechStatus == .authorized else { return false }
 
-        let micGranted = await withCheckedContinuation { continuation in
+        let micGranted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             AVAudioApplication.requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }

@@ -19,19 +19,27 @@ enum MobEngineError: Error, LocalizedError {
 }
 
 /// Wraps LLM.swift (https://github.com/eastriverlee/LLM.swift), which loads
-/// a local .gguf file and runs inference on-device via llama.cpp. Verified
-/// against the package's published README before writing this: `LLM(from:template:)`
-/// to construct, `await bot.getCompletion(from:)` for a one-shot response.
+/// a local .gguf file and runs inference on-device via llama.cpp. Checked
+/// against the package's actual source (not just its README):
+///   public enum Role { case user; case bot }        // top-level, NOT LLM.Role
+///   public typealias Chat = (role: Role, content: String)
+///   public var history: [Chat]
+///   public convenience init?(from: URL, template: Template, ..., historyLimit: Int = 8, ...)
+///   public func getCompletion(from input: borrowing String) async -> String
 final class LLMEngine {
     private let bot: LLM
 
-    /// - Parameter modelResourceName: the .gguf file name (without extension)
-    ///   added to the Xcode project's "Copy Bundle Resources" build phase.
-    init(modelResourceName: String, systemPrompt: String) throws {
+    /// - Parameters:
+    ///   - modelResourceName: the .gguf file name (without extension) added
+    ///     to the Xcode project's "Copy Bundle Resources" build phase.
+    ///   - historyLimit: passed through to LLM.swift, which otherwise
+    ///     silently caps history at its own default of 8 — that would
+    ///     override the caller's context window without any error.
+    init(modelResourceName: String, systemPrompt: String, historyLimit: Int) throws {
         guard let modelURL = Bundle.main.url(forResource: modelResourceName, withExtension: "gguf") else {
             throw MobEngineError.modelNotBundled("\(modelResourceName).gguf")
         }
-        guard let bot = LLM(from: modelURL, template: .chatML(systemPrompt)) else {
+        guard let bot = LLM(from: modelURL, template: .chatML(systemPrompt), historyLimit: historyLimit) else {
             throw MobEngineError.modelFailedToLoad
         }
         self.bot = bot
@@ -41,7 +49,7 @@ final class LLMEngine {
     /// returns its reply with any CALC(...) tool call resolved via SafeEval.
     func respond(to input: String, history: [MemoryEntry]) async -> String {
         bot.history = history.map { entry in
-            (role: entry.role == "user" ? LLM.Role.user : LLM.Role.bot, content: entry.content)
+            (role: entry.role == "user" ? Role.user : Role.bot, content: entry.content)
         }
         let raw = await bot.getCompletion(from: input)
         return Self.resolveToolCalls(in: raw)

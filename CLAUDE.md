@@ -15,13 +15,22 @@ mais Ollama et le code testé sont réels — si tu relances cette validation su
 la machine réelle de l'utilisateur, considère-la comme une reconfirmation,
 pas comme un prérequis bloquant avant l'étape 4.
 
-Même chose côté mobile : le code Swift dans `mobile/Mob/` n'a **jamais été
-compilé** (cet environnement de travail est un conteneur Linux sans Xcode).
-Avant d'avancer sur ce chantier, ouvre-le dans Xcode (ou via Swift
-Playgrounds/iPad, ou un service de build cloud — voir `mobile/README.md`),
-corrige les erreurs de compilation, et vérifie en particulier l'API réelle
-du package `LLM.swift` une fois résolu par Swift Package Manager (voir
-`mobile/README.md`, section « Mise en place »).
+Côté mobile en revanche, le code Swift dans `mobile/Mob/` n'a **jamais été
+compilé** (cet environnement de travail est un conteneur Linux sans Xcode,
+et aucune session Claude Code ne peut ouvrir Xcode sur la machine de
+l'utilisateur — c'est lui qui doit lancer le build).
+
+L'API de `LLM.swift` a été vérifiée contre le **code source réel** du
+package (pas seulement son README) : `Role` est un enum au niveau du
+module (pas `LLM.Role`), `history: [Chat]` avec
+`Chat = (role: Role, content: String)`, init failable
+`init?(from:template:...historyLimit:)` — dont le `historyLimit: Int = 8`
+par défaut, qu'il faut passer explicitement sinon il écrase la fenêtre de
+contexte du appelant. Épinglé sur la ligne 3.x (dernier tag v3.0.3).
+
+`mobile/project.yml` (XcodeGen) génère le projet Xcode complet en une
+commande — c'est la voie recommandée pour le premier build, elle évite
+les réglages manuels de capacités/Info.plist. Voir `mobile/README.md`.
 
 ## État d'avancement
 
@@ -84,9 +93,11 @@ du package `LLM.swift` une fois résolu par Swift Package Manager (voir
   (le paquet `ollama`, `requests`, etc.), vérifie sa signature réelle
   installée avant de coder contre elle — ne suppose jamais une API à
   partir de la documentation seule. Même règle côté Swift : l'API de
-  `LLM.swift` utilisée dans `LLMEngine.swift` a été vérifiée via le
-  README du projet, pas testée en conditions réelles — reconfirme-la
-  une fois le package résolu par Xcode.
+  `LLM.swift` utilisée dans `LLMEngine.swift` a été relue dans le code
+  source réel du package, ce qui a rattrapé une erreur de compilation
+  (`LLM.Role` au lieu de `Role`) et un défaut silencieux
+  (`historyLimit` par défaut à 8) que son README seul ne montrait pas —
+  illustration directe de pourquoi cette convention existe.
 
 ## Setup
 

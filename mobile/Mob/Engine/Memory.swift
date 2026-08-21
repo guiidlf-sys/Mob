@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Persistent conversation memory for Mob, with two storage tiers:
@@ -19,15 +20,22 @@ enum MemoryBackend {
     case device
 }
 
-struct MemoryEntry: Codable {
+/// Sendable because `[MemoryEntry]` is handed to LLMEngine's non-isolated
+/// async `respond(to:history:)` from the main actor.
+struct MemoryEntry: Codable, Sendable {
     let role: String
     let content: String
 }
 
-final class Memory {
+/// ObservableObject rather than a plain class: SwiftUI has to redraw the
+/// transcript when a turn is appended, and a plain reference type mutated
+/// behind @State never triggers that — the conversation would silently
+/// never appear on screen.
+@MainActor
+final class Memory: ObservableObject {
     private let fileName: String
-    private(set) var history: [MemoryEntry]
-    private(set) var backend: MemoryBackend
+    @Published private(set) var history: [MemoryEntry]
+    @Published private(set) var backend: MemoryBackend
 
     init(fileName: String = "memory.json") {
         self.fileName = fileName
