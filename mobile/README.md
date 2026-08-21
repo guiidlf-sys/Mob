@@ -73,19 +73,28 @@ Vérifié : compiler et signer une vraie app iOS nécessite toujours un Mac
 
 - **Swift Playgrounds sur iPad** (pas sur iPhone — la fonctionnalité de
   build/publication n'existe que sur iPad, pas sur iPhone) permet de
-  créer, compiler et soumettre une app à l'App Store sans Mac. Si tu as
-  un iPad (même ancien, iPadOS 15.2+), c'est l'option la plus directe.
+  créer et compiler une app sans Mac. Si tu as un iPad (même ancien,
+  iPadOS 15.2+), c'est l'option la plus directe.
 - **Services de build Mac dans le cloud** (Xcode Cloud d'Apple,
   Codemagic, Code2Native...) : tu envoies le code, ils compilent sur de
-  vrais Macs dans un datacenter, tu récupères l'app signée ou elle part
-  directement sur TestFlight pour installation sur ton iPhone. C'est
+  vrais Macs dans un datacenter, tu récupères l'app signée. C'est
   l'option réaliste si tu n'as ni Mac ni iPad — pas besoin de matériel
-  Apple supplémentaire, juste un compte (souvent payant au-delà d'un
-  usage gratuit limité) en plus du compte développeur Apple à 99$/an
-  si tu veux dépasser les 7 jours de réinstallation.
+  Apple supplémentaire.
 - **Depuis ton iPhone seul, sans iPad ni Mac** : aucune de ces deux
   options ne tourne entièrement sur iPhone — il faudra soit un iPad,
   soit un service cloud, pour la partie compilation.
+
+**Comme Mob est pour ton usage personnel uniquement (toi et toi seul,
+pas de distribution)** : pas besoin de soumettre quoi que ce soit à
+l'App Store ni à TestFlight — ce que je mentionnais dans une version
+précédente de ce fichier ne s'applique pas à ton cas. Il suffit
+d'installer l'app directement sur ton iPhone en développement personnel
+(bouton "Run" dans Xcode avec l'iPhone branché ou sur le même réseau).
+Ça simplifie aussi le compte Apple : un identifiant Apple gratuit
+suffit techniquement, la seule contrepartie étant de rebrancher et
+relancer un build tous les 7 jours pour renouveler la signature — le
+compte développeur payant (99$/an) sert uniquement à éviter cette
+corvée de réinstallation, pas à publier quoi que ce soit.
 
 ## Prérequis
 
