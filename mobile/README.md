@@ -145,9 +145,23 @@ lire les erreurs et itérer toute seule. C'est le moyen de corriger les
 erreurs résiduelles du premier build sans faire l'aller-retour à la
 main.
 
-Prérequis : Xcode installé depuis l'App Store (compter ~40 Go de disque
-une fois les SDK dépliés — c'est du disque, pas de la RAM, donc les
-8 Go du Mac ne sont pas un problème ici), puis :
+**Quelle version d'Xcode installer.** Le Mac de l'utilisateur tourne sur
+**macOS Sequoia 15.7.4**, et l'App Store ne propose que le dernier Xcode
+(26.4+), qui exige macOS Tahoe 26.2 — d'où un refus d'installation. La
+bonne version est **Xcode 26.3**, qui demande macOS 15.6 minimum et
+passe donc : à récupérer sur
+[developer.apple.com/download/all](https://developer.apple.com/download/all/)
+(identifiant Apple gratuit), pas sur l'App Store. Xcode 16.4 (macOS 15.3
+minimum) marche aussi en repli. N'importe lequel des deux suffit : ce
+projet cible iOS 17, il n'a pas besoin d'un SDK récent.
+
+Inutile d'installer la mise à jour macOS 15.8 au passage — elle ne
+débloque pas un Xcode plus récent (il faudrait Tahoe 26.2) et coûte
+15,6 Go de disque.
+
+Compter ~40 Go pour Xcode une fois les SDK dépliés, et le double
+temporairement pendant la décompression du `.xip`. C'est du disque, pas
+de la RAM — les 8 Go du Mac ne sont pas un problème ici. Ensuite :
 
 ```
 xcode-select --install
