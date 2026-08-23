@@ -34,6 +34,64 @@ prix de gros détours :
 - **Voix dans les deux sens** : dictée (là où le navigateur la propose)
   et lecture à voix haute des réponses, activable par le bouton 🔊.
 - **Marche aussi sur le Mac**, même adresse.
+- **Génère des images** — demande-en une, Mob l'affiche. Sans clé ni
+  compte : le service ([Pollinations](https://pollinations.ai)) sert
+  l'image par simple URL, donc une balise `<img>` suffit. Contrepartie :
+  environ une image toutes les 15 secondes, et le service peut être
+  saturé — l'échec est alors affiché, pas silencieux.
+- **Génère des sites web** — demande une page, Mob écrit un document HTML
+  complet et autonome, puis propose **Aperçu**, **Enregistrer** et
+  **Copier le code**. Le code est retiré de la bulle pour rester lisible
+  sur téléphone ; il reste entier derrière les boutons.
+
+### Déclenchement vocal : « Dis Siri, Mob »
+
+Un raccourci iOS de **trois actions** dicte ta question et ouvre Mob
+avec elle déjà posée, via `?q=`. Aucune clé d'API dedans, aucun compte
+développeur, aucune péremption à 7 jours — voir
+[`shortcut/README.md`](shortcut/README.md).
+
+C'est le seul chemin vocal gratuit, et iOS 27 ne l'a pas changé : SiriKit
+y est retiré au profit des App Intents, mais ceux-ci exigent toujours
+l'autorisation Siri, réservée au compte Apple Developer payant.
+
+### Réglages
+
+Une vraie fenêtre de réglages, en cinq sections :
+
+| Section | Contenu |
+|---|---|
+| **Compte** | État connecté, repère de la clé (`···1234`), *Modifier*, *Se déconnecter* |
+| **Apparence** | Thème **Auto / Sombre / Clair**, taille du texte sur quatre crans |
+| **Voix** | Lecture à voix haute, vitesse de lecture |
+| **Conversation** | Modèle, mémoire relue à chaque question (4 à 60 messages) |
+| **Données** | Effacer la conversation |
+
+**La clé n'est demandée qu'une fois.** Une fois enregistrée, le champ
+disparaît et l'état passe à « Connecté » ; enregistrer un autre réglage
+ne l'efface pas, et un rechargement la retrouve. Seul *Se déconnecter*
+la supprime.
+
+⚠️ Sur iOS, **l'app ajoutée à l'écran d'accueil a un stockage distinct
+de Safari**. Si la clé semble redemandée, c'est presque toujours ça :
+il faut la saisir une fois dans chacun des deux. Ce n'est pas un oubli
+de l'app, ce sont deux emplacements séparés par le système.
+
+### Vérification automatique
+
+`tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
+en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
+survit-elle à un rechargement — plutôt que la présence des éléments
+dans le HTML. 26 contrôles.
+
+`.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
+sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull
+request. Un échec fait rougir l'onglet Actions.
+
+```
+cd docs && python3 -m http.server 8899 &
+node tests/ui-check.mjs http://localhost:8899/
+```
 
 ### Activer l'hébergement (une seule fois)
 
@@ -48,9 +106,21 @@ L'adresse sera **https://guiidlf-sys.github.io/Mob/**
 
 ### Première utilisation
 
-Ouvre l'adresse, touche ⚙, colle une clé d'API créée sur
-[console.mistral.ai](https://console.mistral.ai) (palier gratuit, sans
-carte bancaire). C'est tout.
+Ouvre l'adresse, touche ⚙, colle une clé d'API, **Enregistrer**.
+
+Pour obtenir la clé sur [console.mistral.ai](https://console.mistral.ai)
+— deux étapes non évidentes que le site ne met pas en avant :
+
+1. Connexion (email, Google ou Apple)
+2. **Vérification par numéro de téléphone** — obligatoire pour activer
+   l'accès API, même gratuit
+3. **Section Billing → sélectionner explicitement le plan gratuit
+   « Experiment »**. Aucune carte bancaire n'est demandée, mais sans ce
+   choix explicite **la clé est créée et ne fonctionne pas** : c'est la
+   cause la plus fréquente d'un « Clé d'API refusée » alors que la clé
+   semble correcte.
+4. **API Keys → Create new key**, puis copier tout de suite — la valeur
+   n'est affichée qu'une seule fois.
 
 ### Où va la clé
 

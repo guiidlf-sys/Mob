@@ -1,0 +1,79 @@
+name: Vérification de Mob
+
+# Surveille le site en ligne, pas le dépôt : ce qui compte est que l'app
+# que l'utilisateur ouvre sur son téléphone fonctionne réellement.
+# Chaque contrôle pilote un vrai navigateur et clique les boutons, plutôt
+# que de vérifier leur simple présence dans le HTML.
+
+on:
+  schedule:
+    # Toutes les 3 heures. L'heure est en UTC ; peu importe ici, seule la
+    # cadence compte.
+    - cron: '0 */3 * * *'
+  # Après chaque déploiement : c'est le moment où une régression apparaît.
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'tests/**'
+      - '.github/workflows/health-check.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'tests/**'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Adresse à vérifier"
+        required: false
+        default: 'https://guiidlf-sys.github.io/Mob/'
+
+jobs:
+  verifier:
+    name: Tous les boutons répondent
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      # Sur une pull request, le site en ligne ne contient pas encore les
+      # modifications : on teste alors la copie du dépôt, servie
+      # localement. Sinon on teste le vrai site.
+      - name: Choisir la cible
+        id: cible
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            nohup python3 -m http.server 8899 --directory docs >/dev/null 2>&1 &
+            sleep 2
+            echo "url=http://localhost:8899/" >> "$GITHUB_OUTPUT"
+            echo "quoi=la version de cette pull request" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${{ github.event.inputs.url || 'https://guiidlf-sys.github.io/Mob/' }}" >> "$GITHUB_OUTPUT"
+            echo "quoi=le site en ligne" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Vérifier ${{ steps.cible.outputs.quoi }}
+        run: node tests/ui-check.mjs "${{ steps.cible.outputs.url }}"
+
+      - name: Résumé
+        if: always()
+        run: |
+          echo "### Vérification de Mob" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cible : ${{ steps.cible.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Tout répond correctement." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ Au moins un contrôle a échoué — voir le journal de l'étape précédente." >> "$GITHUB_STEP_SUMMARY"
+          fi

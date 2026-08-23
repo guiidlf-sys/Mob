@@ -106,7 +106,10 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   fenêtre envoyée au modèle est bornée). Détails, limites et étapes de
   build manuelles dans `mobile/README.md` — à valider sur un Mac (ou
   iPad/service de build cloud, voir README) avant de continuer.
-- **Piste web app — `docs/index.html`, la plus aboutie à ce jour** :
+- **Piste web app — `docs/index.html`, EN LIGNE ET VÉRIFIÉE** :
+  déployée sur **https://guiidlf-sys.github.io/Mob/** (GitHub Pages,
+  branche `main`, dossier `/docs`) — page et icône répondent bien `200`.
+  C'est la piste aboutie ; les autres restent des chantiers.
   page unique autonome (aucune dépendance, aucun build) qui appelle
   l'API Mistral **directement depuis le navigateur** — vérifié que
   `api.mistral.ai` renvoie bien `access-control-allow-origin: *`, donc
@@ -148,6 +151,35 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   revient, l'option qui reste sur la table est une API cloud payante
   pour les tâches ponctuelles qui le demandent — ne pas la construire
   sans que l'utilisateur le redemande explicitement.
+
+## Vérifier la web app — à faire à chaque modification
+
+`tests/ui-check.mjs` pilote un vrai navigateur et **clique réellement
+chaque bouton**, en vérifiant l'effet obtenu dans la page (le thème
+change-t-il vraiment ? la clé est-elle encore là après rechargement ?)
+plutôt que la simple présence des éléments dans le HTML.
+
+```
+cd docs && python3 -m http.server 8899 &
+MOB_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
+  node tests/ui-check.mjs http://localhost:8899/
+```
+
+`MOB_CHROMIUM` sert quand la version de Playwright installée ne
+correspond pas au Chromium présent dans le conteneur — sans la variable,
+Playwright cherche son propre téléchargement.
+
+`.github/workflows/health-check.yml` lance la même suite **toutes les
+3 heures** sur le site en ligne, plus à chaque poussée sur `main` et sur
+chaque pull request (là, contre la copie du dépôt, le site en ligne
+n'ayant pas encore les modifications). Un échec fait rougir l'onglet
+Actions et déclenche la notification GitHub habituelle.
+
+**Attente de l'utilisateur, à respecter à chaque modification :**
+terminer par une sauvegarde (commit + push) et lui redonner l'adresse
+**https://guiidlf-sys.github.io/Mob/**. Rappel : Pages sert depuis
+`main`, donc une modification n'atteint le site qu'une fois la pull
+request fusionnée.
 
 ## Conventions établies
 
