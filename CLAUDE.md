@@ -152,6 +152,24 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   pour les tâches ponctuelles qui le demandent — ne pas la construire
   sans que l'utilisateur le redemande explicitement.
 
+## Interface : deux espaces, et ce qu'ils ne sont pas
+
+`docs/index.html` sépare un espace **utilisateur** (Chat, Créations,
+Réglages) d'un espace **administrateur** (modèle, fenêtre de mémoire,
+prompt système, statistiques, effacement total), déverrouillé par un code
+(`mob` par défaut, dans `mob.adminCode`).
+
+**Ne présente jamais cette séparation comme une sécurité.** Le code d'une
+page web est lisible par tous : le verrou range l'interface, il ne
+protège rien. C'est écrit noir sur blanc dans l'app elle-même, et il faut
+que ça le reste. Une vraie séparation de droits demanderait un serveur —
+ce que ce projet n'a pas, par choix.
+
+Piège CSS rencontré et corrigé, à ne pas réintroduire : l'attribut
+`hidden` est **sans effet** dès qu'une règle impose un `display`. Sans la
+règle `[hidden] { display: none !important; }`, tout l'espace admin
+restait visible sans code.
+
 ## Vérifier la web app — à faire à chaque modification
 
 `tests/ui-check.mjs` pilote un vrai navigateur et **clique réellement

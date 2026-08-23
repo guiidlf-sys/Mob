@@ -5,18 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Mob</title>
 
-<!-- Ajouté à l'écran d'accueil, iOS lance la page en plein écran sans
-     la barre Safari, avec son propre nom sous l'icône. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mob">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#0a0a0f">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 
 <script>
-  // Posé avant le rendu pour éviter un éclair blanc à l'ouverture en
-  // thème sombre : le script principal, lui, est en fin de page.
+  // Posé avant le rendu : sans ça, un utilisateur en thème sombre reçoit
+  // un éclair blanc à chaque ouverture, le script principal étant en fin
+  // de page.
   (function () {
     try {
       var c = JSON.parse(localStorage.getItem("mob.theme") || '"auto"');
@@ -30,114 +29,170 @@
 </script>
 
 <style>
-  /* Thème sombre — celui par défaut. Le clair est plus bas ; c'est le
-     script qui pose data-theme sur <html>, y compris quand le réglage
-     est « automatique » (il résout alors la préférence du système). */
   :root {
-    --bg: #0d0f14;
-    --surface: #171a21;
-    --surface-2: #1f232c;
-    --line: #2a2f3a;
-    --text: #e8eaed;
-    --muted: #9aa1ad;
-    --accent: #f0b429;
-    --accent-ink: #241a00;
-    --user: #2a3140;
-    --danger: #ff6b6b;
-    --radius: 16px;
+    --bg: #08070d;
+    --panel: #100e18;
+    --surface: #17141f;
+    --surface-2: #1f1a2b;
+    --line: #2b2440;
+    --text: #f2f0f7;
+    --muted: #9b93b0;
+    --accent: #c77dff;
+    --accent-2: #e0aaff;
+    --accent-ink: #1a0b28;
+    --danger: #ff6b8a;
+    --ok: #4ade80;
+    --radius: 18px;
     --fs: 16px;
+    --glow: rgba(199, 125, 255, .28);
+    --card-grad: linear-gradient(150deg, rgba(199,125,255,.16), rgba(199,125,255,.03) 55%);
   }
 
   :root[data-theme="light"] {
-    --bg: #e9edf3;
+    --bg: #ece8f4;
+    --panel: #ffffff;
     --surface: #ffffff;
-    --surface-2: #dfe4ec;
-    --line: #c9d1dd;
-    --text: #14171c;
-    --muted: #55606e;
-    --accent: #9a6f08;
+    --surface-2: #f0ebf9;
+    --line: #d9d0ea;
+    --text: #17122a;
+    --muted: #5c5473;
+    --accent: #7b2cbf;
+    --accent-2: #9d4edd;
     --accent-ink: #ffffff;
-    --user: #c9d9ef;
-    --danger: #b3271b;
+    --danger: #c0244a;
+    --ok: #1a7f43;
+    --glow: rgba(123, 44, 191, .16);
+    --card-grad: linear-gradient(150deg, rgba(123,44,191,.10), rgba(123,44,191,.02) 55%);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+  /* « hidden » ne l'emporte pas sur un display explicite : sans cette
+     règle, tout élément masqué mais stylé en flex reste affiché. */
+  [hidden] { display: none !important; }
+
   html, body {
-    margin: 0;
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font: var(--fs)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font: var(--fs)/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     overscroll-behavior: none;
-    transition: background .2s, color .2s;
   }
 
-  #app {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
+  /* Halo diffus derrière l'interface, comme sur la référence. */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(60% 45% at 78% 8%, var(--glow), transparent 70%),
+      radial-gradient(50% 40% at 12% 92%, var(--glow), transparent 70%);
   }
 
-  header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--bg);
-  }
-  header .mark {
-    width: 30px; height: 30px; border-radius: 9px;
-    background: var(--accent); color: var(--accent-ink);
-    display: grid; place-items: center;
-    font-weight: 700; font-size: 15px;
-  }
-  header h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-  header .spacer { flex: 1; }
+  #app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100dvh; }
 
-  .icon-btn {
-    width: 38px; height: 38px; border-radius: 11px;
+  /* ---------- en-tête ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .mark {
+    width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); display: grid; place-items: center;
+    font-weight: 800; font-size: 16px;
+    box-shadow: 0 6px 20px var(--glow);
+  }
+  .brand .who { min-width: 0; }
+  .brand .who b { display: block; font-size: 15.5px; font-weight: 650; letter-spacing: .2px; }
+  .who b { display: block; }
+  .who small {
+    display: block; color: var(--muted); font-size: 11.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar .spacer { flex: 1; }
+
+  .chip {
+    height: 38px; min-width: 38px; padding: 0 12px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--surface);
-    color: var(--text); font-size: 17px; cursor: pointer;
-    display: grid; place-items: center;
+    color: var(--text); font: inherit; font-size: 15px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
   }
-  .icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-
-  main {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 16px 16px 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .chip[aria-pressed="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent;
+  }
+  .chip.badge-admin {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent; height: 26px; padding: 0 10px;
   }
 
-  .msg { max-width: 88%; padding: 11px 14px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
-  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 5px; }
-  .msg.bot { align-self: flex-start; background: var(--surface); border-bottom-left-radius: 5px; }
-  .msg.error { align-self: stretch; background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; }
+  /* ---------- corps ---------- */
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-  .gen { margin-top: 10px; }
-  .gen img { width: 100%; border-radius: 12px; display: block; background: var(--surface-2); }
-  .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
-  .gen-fail { margin-top: 10px; font-size: 13px; color: var(--danger); }
+  .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .view.active { display: flex; }
 
-  .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .gen-actions button {
-    padding: 9px 13px; border-radius: 10px; font: inherit; font-size: 14px;
-    border: 1px solid var(--accent); background: transparent;
-    color: var(--accent); cursor: pointer;
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px 8px; }
+
+  .card {
+    background: var(--surface); background-image: var(--card-grad);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card > h2 { margin: 0 0 3px; font-size: 16px; font-weight: 650; }
+  .card > p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+
+  /* ---------- conversation ---------- */
+  #messages { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+
+  .msg { max-width: 88%; padding: 12px 15px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user {
+    align-self: flex-end; border-bottom-right-radius: 6px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
+  }
+  .msg.bot {
+    align-self: flex-start; border-bottom-left-radius: 6px;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .msg.error {
+    align-self: stretch; background: transparent;
+    border: 1px solid var(--danger); color: var(--danger); font-size: 14px;
   }
 
   .older {
     align-self: center; font-size: 12px; color: var(--muted);
-    padding: 4px 12px; border-radius: 999px; background: var(--surface-2);
+    padding: 5px 13px; border-radius: 999px; background: var(--surface-2);
   }
 
-  .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
-  .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 17px; }
+  .gen { margin-top: 11px; }
+  .gen img {
+    width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-radius: 13px; display: block; background: var(--surface-2);
+  }
+  .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
+  .gen-fail { margin-top: 11px; font-size: 13px; color: var(--danger); }
+
+  .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .gen-actions button {
+    padding: 9px 13px; border-radius: 11px; font: inherit; font-size: 13.5px;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer;
+  }
+
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 30px 20px; }
+  .empty .big {
+    width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 20px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); display: grid; place-items: center;
+    font-size: 27px; font-weight: 800; box-shadow: 0 10px 34px var(--glow);
+  }
+  .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 18px; }
+
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+  .suggest button {
+    padding: 9px 14px; border-radius: 999px; font: inherit; font-size: 13.5px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
+  }
 
   .thinking { align-self: flex-start; color: var(--muted); font-size: 14px; padding: 4px 2px; }
   .thinking span { animation: blink 1.2s infinite; }
@@ -145,268 +200,511 @@
   .thinking span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%,60%,100% { opacity: .25 } 30% { opacity: 1 } }
 
-  #composer {
-    display: flex; align-items: flex-end; gap: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--bg);
-  }
+  /* ---------- zone de saisie ---------- */
+  #composer { display: flex; align-items: flex-end; gap: 9px; padding: 10px 16px 12px; }
   #input {
     flex: 1; resize: none; max-height: 140px;
-    padding: 11px 14px; border-radius: 20px;
-    border: 1px solid var(--line); background: var(--surface-2);
+    padding: 12px 16px; border-radius: 22px;
+    border: 1px solid var(--line); background: var(--surface);
     color: var(--text); font: inherit; line-height: 1.4;
   }
   #input:focus { outline: none; border-color: var(--accent); }
 
-  .send { width: 42px; height: 42px; border-radius: 50%; border: none;
-          background: var(--accent); color: var(--accent-ink); font-size: 18px;
-          cursor: pointer; flex-shrink: 0; }
-  .send:disabled { opacity: .4; }
-  .mic { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-         border: 1px solid var(--line); background: var(--surface-2);
-         color: var(--text); font-size: 18px; cursor: pointer; }
-  .mic.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
-  @keyframes pulse { 50% { transform: scale(1.08) } }
-
-  dialog {
-    border: none; border-radius: 20px; padding: 0; width: min(440px, 92vw);
-    max-height: 90dvh; background: var(--surface); color: var(--text);
+  .round {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); font-size: 18px; cursor: pointer;
   }
-  dialog::backdrop { background: rgba(0,0,0,.6); }
-  .sheet { padding: 20px; }
-  .sheet h2 { margin: 0 0 4px; font-size: 19px; }
-  .sheet p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
-  input[type=password], input[type=text], select {
-    width: 100%; padding: 11px 13px; border-radius: 11px;
+  .round.primary {
+    border: none; color: var(--accent-ink);
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    box-shadow: 0 6px 20px var(--glow);
+  }
+  .round.primary:disabled { opacity: .45; box-shadow: none; }
+  .round.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.09) } }
+
+  /* ---------- navigation ---------- */
+  nav {
+    display: flex; gap: 4px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line); background: var(--panel);
+  }
+  nav button {
+    flex: 1; padding: 8px 4px; border: none; background: none; cursor: pointer;
+    color: var(--muted); font: inherit; font-size: 10.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 12px;
+  }
+  nav button .ico { font-size: 19px; line-height: 1; }
+  nav button[aria-current="page"] { color: var(--accent); background: var(--surface); }
+
+  /* ---------- réglages ---------- */
+  .field { margin-top: 15px; }
+  .field > label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; }
+  input[type=password], input[type=text], select, textarea.box {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--surface-2);
     color: var(--text); font: inherit;
   }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
-  .row span { font-size: 14.5px; }
-  .btns { display: flex; gap: 10px; margin-top: 22px; }
-  button.primary { flex: 1; padding: 12px; border-radius: 12px; border: none;
-                   background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
-  button.ghost { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
-                 background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
-  .note { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .note a { color: var(--accent); }
+  textarea.box { min-height: 108px; resize: vertical; line-height: 1.5; font-size: 14px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
 
-  /* Interrupteur */
-  .switch { position: relative; width: 48px; height: 29px; flex-shrink: 0; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; inset: 0; background: var(--surface-2);
-            border: 1px solid var(--line); border-radius: 29px; transition: .2s; cursor: pointer; }
-  .slider:before { content: ""; position: absolute; width: 23px; height: 23px; left: 2px; top: 2px;
-                   background: var(--muted); border-radius: 50%; transition: .2s; }
-  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
-  .switch input:checked + .slider:before { transform: translateX(19px); background: var(--accent-ink); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; }
+  .row .lbl { font-size: 14.5px; }
+  .row .lbl small { display: block; color: var(--muted); font-size: 12px; }
 
-  /* --- Réglages --- */
-  .sheet { max-height: 82dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-
-  .section { margin-top: 26px; }
-  .section:first-of-type { margin-top: 12px; }
-  .section > h3 {
-    margin: 0 0 2px; font-size: 12px; font-weight: 650;
-    text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
-  }
-  .section > .hint { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
-  .section .row:first-of-type { margin-top: 10px; }
-
-  /* Contrôle segmenté (thème, taille du texte) */
-  .seg { display: flex; gap: 6px; margin-top: 8px; }
+  .seg { display: flex; gap: 6px; }
   .seg button {
-    flex: 1; padding: 10px 6px; border-radius: 10px; cursor: pointer;
+    flex: 1; padding: 10px 5px; border-radius: 11px; cursor: pointer;
     border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--muted); font: inherit; font-size: 14px;
+    color: var(--muted); font: inherit; font-size: 13.5px;
   }
   .seg button[aria-pressed="true"] {
-    background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent; font-weight: 650;
   }
 
   .state {
-    display: flex; align-items: center; gap: 9px;
-    padding: 12px 14px; border-radius: 12px;
-    background: var(--surface-2); border: 1px solid var(--line);
-    font-size: 14px; margin-top: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 13px 15px;
+    border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); font-size: 14px;
   }
   .state .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--danger); }
-  .state.on .dot { background: #35c759; }
-  .state .who { flex: 1; }
-  .state .who small { display: block; color: var(--muted); font-size: 12px; }
+  .state.on .dot { background: var(--ok); box-shadow: 0 0 9px var(--ok); }
+  .state .who2 { flex: 1; min-width: 0; }
+  .state .who2 small { display: block; color: var(--muted); font-size: 12px; }
 
   .link-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline;
   }
-  .danger-btn {
-    width: 100%; margin-top: 10px; padding: 11px; border-radius: 11px; cursor: pointer;
-    border: 1px solid var(--danger); background: transparent;
-    color: var(--danger); font: inherit; font-size: 14px;
+  .btn {
+    width: 100%; padding: 12px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 14.5px;
+    border: none; color: var(--accent-ink); font-weight: 650;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+  }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
+  .btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); font-weight: 400; }
+  .btn + .btn { margin-top: 9px; }
+
+  .range { width: 100%; accent-color: var(--accent); }
+  .range-val { color: var(--muted); }
+
+  .note { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+  .note a { color: var(--accent); }
+  .warn {
+    margin-top: 13px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.55;
+    border: 1px solid var(--danger); color: var(--danger); background: transparent;
   }
 
-  .range { width: 100%; accent-color: var(--accent); margin-top: 10px; }
-  .range-val { font-size: 13px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { padding: 13px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); }
+  .stat b { display: block; font-size: 19px; font-weight: 700; }
+  .stat small { color: var(--muted); font-size: 11.5px; }
+
+  /* ---------- créations ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .tile { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+  .tile img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+  .tile .lab { padding: 8px 10px; font-size: 11.5px; color: var(--muted);
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- large écran : barre latérale, comme la référence ---------- */
+  @media (min-width: 900px) {
+    #app { flex-direction: row; padding: 18px; gap: 18px; }
+    nav {
+      order: -1;
+      flex-direction: column; width: 224px; flex-shrink: 0; gap: 6px;
+      border: 1px solid var(--line); border-radius: 22px; padding: 16px 12px;
+      background: var(--panel);
+    }
+    nav button { flex: none; flex-direction: row; justify-content: flex-start; gap: 11px; padding: 12px 14px; font-size: 14.5px; }
+    nav button .ico { font-size: 17px; }
+    nav .nav-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; }
+    main {
+      flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 22px;
+      background: var(--panel); overflow: hidden; flex-direction: column;
+    }
+    .topbar { padding: 18px 22px 12px; }
+    .scroll { padding: 4px 22px 8px; }
+    #composer { padding: 12px 22px 18px; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .brand { display: none; }
+  }
+  @media (max-width: 899px) { nav .nav-brand { display: none; } }
 </style>
 </head>
 <body>
 
 <div id="app">
-  <header>
-    <div class="mark">M</div>
-    <h1>Mob</h1>
-    <div class="spacer"></div>
-    <button class="icon-btn" id="voiceToggle" aria-pressed="false" title="Lecture à voix haute">🔊</button>
-    <button class="icon-btn" id="openSettings" title="Réglages">⚙</button>
-  </header>
-
-  <main id="messages"></main>
-
-  <div id="composer">
-    <button class="mic" id="mic" title="Dicter">🎙</button>
-    <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
-    <button class="send" id="send" title="Envoyer">↑</button>
-  </div>
-</div>
-
-<dialog id="settings">
-  <form method="dialog" class="sheet" id="settingsForm">
-    <h2>Réglages</h2>
-    <p class="sub">Tout reste sur cet appareil.</p>
-
-    <!-- Compte -->
-    <div class="section">
-      <h3>Compte</h3>
-      <div class="state" id="accountState">
-        <span class="dot"></span>
-        <span class="who" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
-        <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+  <main>
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark">M</div>
+        <div class="who">
+          <b id="hello">Mob</b>
+          <small id="helloSub">Ton assistant personnel</small>
+        </div>
       </div>
-
-      <div id="keyFields">
-        <label for="key">Clé d'API Mistral</label>
-        <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
-        <p class="hint" style="margin-top:8px">
-          Elle n'est demandée qu'une fois : elle reste dans ce navigateur et
-          te reconnecte automatiquement ensuite. Crée-la sur
-          <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
-        </p>
-      </div>
-
-      <button type="button" class="danger-btn" id="signOut" hidden>Se déconnecter</button>
-    </div>
-
-    <!-- Apparence -->
-    <div class="section">
-      <h3>Apparence</h3>
-
-      <label>Thème</label>
-      <div class="seg" id="themeSeg" role="group" aria-label="Thème">
-        <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
-        <button type="button" data-theme-choice="dark" aria-pressed="false">Sombre</button>
-        <button type="button" data-theme-choice="light" aria-pressed="false">Clair</button>
-      </div>
-      <p class="hint" style="margin-top:8px">« Auto » suit le réglage de ton iPhone.</p>
-
-      <label>Taille du texte</label>
-      <div class="seg" id="sizeSeg" role="group" aria-label="Taille du texte">
-        <button type="button" data-size="15" aria-pressed="false">Petit</button>
-        <button type="button" data-size="16" aria-pressed="false">Normal</button>
-        <button type="button" data-size="18" aria-pressed="false">Grand</button>
-        <button type="button" data-size="21" aria-pressed="false">Très grand</button>
-      </div>
-    </div>
-
-    <!-- Voix -->
-    <div class="section">
-      <h3>Voix</h3>
-      <div class="row">
-        <span>Lire les réponses à voix haute</span>
-        <label class="switch"><input type="checkbox" id="speakPref"><span class="slider"></span></label>
-      </div>
-
-      <label for="rate">Vitesse de lecture — <span class="range-val" id="rateVal">normale</span></label>
-      <input type="range" class="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+      <span class="chip badge-admin" id="adminBadge" hidden>Admin</span>
+      <div class="spacer"></div>
+      <button class="chip" id="voiceToggle" aria-pressed="false" title="Lecture à voix haute">🔊</button>
     </div>
 
     <!-- Conversation -->
-    <div class="section">
-      <h3>Conversation</h3>
+    <section class="view active" id="view-chat">
+      <div class="scroll"><div id="messages"></div></div>
+      <div id="composer">
+        <button class="round" id="mic" title="Dicter">🎙</button>
+        <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
+        <button class="round primary" id="send" title="Envoyer">↑</button>
+      </div>
+    </section>
 
-      <label for="model">Modèle</label>
-      <select id="model">
-        <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
-        <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
-        <option value="mistral-large-latest">Mistral Large — le plus capable</option>
-      </select>
+    <!-- Créations -->
+    <section class="view" id="view-creations">
+      <div class="scroll">
+        <div class="card">
+          <h2>Tes créations</h2>
+          <p class="sub">Les images et les pages produites au fil des conversations.</p>
+          <div id="creations"></div>
+        </div>
+      </div>
+    </section>
 
-      <label for="ctx">Mémoire envoyée — <span class="range-val" id="ctxVal">24 messages</span></label>
-      <input type="range" class="range" id="ctx" min="4" max="60" step="2" value="24">
-      <p class="hint" style="margin-top:8px">
-        Combien d'échanges passés Mob relit à chaque question. Plus haut, il
-        suit mieux le fil ; plus bas, il répond plus vite. Ton historique
-        complet est gardé quoi qu'il arrive.
-      </p>
+    <!-- Réglages -->
+    <section class="view" id="view-settings">
+      <div class="scroll">
+        <div class="card">
+          <h2>Compte</h2>
+          <p class="sub">Ta clé sert d'identifiant et reste sur cet appareil.</p>
+          <div class="state" id="accountState">
+            <span class="dot"></span>
+            <span class="who2" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
+            <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+          </div>
+          <div id="keyFields">
+            <div class="field">
+              <label for="key">Clé d'API Mistral</label>
+              <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+            </div>
+            <p class="note">
+              Demandée une seule fois : elle reste dans ce navigateur et te
+              reconnecte ensuite. À créer sur
+              <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+            </p>
+          </div>
+          <button type="button" class="btn danger" id="signOut" hidden style="margin-top:12px">Se déconnecter</button>
+        </div>
+
+        <div class="card">
+          <h2>Apparence</h2>
+          <p class="sub">Le thème suit ton iPhone si tu laisses « Auto ».</p>
+          <div class="field">
+            <label>Thème</label>
+            <div class="seg" id="themeSeg" role="group" aria-label="Thème">
+              <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
+              <button type="button" data-theme-choice="dark" aria-pressed="false">Sombre</button>
+              <button type="button" data-theme-choice="light" aria-pressed="false">Clair</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Taille du texte</label>
+            <div class="seg" id="sizeSeg" role="group" aria-label="Taille du texte">
+              <button type="button" data-size="15" aria-pressed="false">Petit</button>
+              <button type="button" data-size="16" aria-pressed="false">Normal</button>
+              <button type="button" data-size="18" aria-pressed="false">Grand</button>
+              <button type="button" data-size="21" aria-pressed="false">Très grand</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Voix</h2>
+          <div class="row">
+            <span class="lbl">Lire les réponses à voix haute</span>
+            <button class="chip" id="speakPref" type="button" aria-pressed="false">Non</button>
+          </div>
+          <div class="field">
+            <label for="rate">Vitesse de lecture — <span class="range-val" id="rateVal">normale</span></label>
+            <input type="range" class="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Données</h2>
+          <p class="sub">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
+          <button type="button" class="btn danger" id="clearHistory">Effacer la conversation</button>
+        </div>
+
+        <div class="card">
+          <h2>Espace administrateur</h2>
+          <p class="sub" id="adminSub">Réservé au propriétaire de l'instance.</p>
+          <div class="field" id="adminUnlock">
+            <label for="adminCode">Code d'accès</label>
+            <input type="password" id="adminCode" placeholder="code" autocomplete="off">
+            <button type="button" class="btn ghost" id="adminEnter" style="margin-top:10px">Ouvrir l'espace admin</button>
+          </div>
+          <button type="button" class="btn ghost" id="adminLeave" hidden>Quitter le mode admin</button>
+          <div class="warn">
+            Ce code range l'interface, il ne la protège pas. Mob est une page
+            web : son code est lisible par quiconque, donc rien de ce qui est
+            caché ici n'est réellement inaccessible. Une vraie séparation de
+            droits demanderait un serveur.
+          </div>
+        </div>
+
+        <p class="note" style="text-align:center">
+          Mob · <a href="https://github.com/guiidlf-sys/Mob" target="_blank" rel="noopener">code source</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Admin -->
+    <section class="view" id="view-admin">
+      <div class="scroll">
+        <div class="card">
+          <h2>État</h2>
+          <p class="sub">Ce que cette instance contient en ce moment.</p>
+          <div class="stats">
+            <div class="stat"><b id="statMsgs">0</b><small>messages gardés</small></div>
+            <div class="stat"><b id="statImgs">0</b><small>images générées</small></div>
+            <div class="stat"><b id="statSites">0</b><small>pages générées</small></div>
+            <div class="stat"><b id="statSize">0 Ko</b><small>stockage utilisé</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Modèle</h2>
+          <p class="sub">Choix réservé à l'admin : il change le coût et la qualité.</p>
+          <div class="field">
+            <label for="model">Modèle utilisé</label>
+            <select id="model">
+              <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
+              <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
+              <option value="mistral-large-latest">Mistral Large — le plus capable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ctx">Mémoire relue — <span class="range-val" id="ctxVal">24 messages</span></label>
+            <input type="range" class="range" id="ctx" min="4" max="60" step="2" value="24">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Personnalité</h2>
+          <p class="sub">Les instructions que Mob reçoit avant chaque question.</p>
+          <textarea class="box" id="sysPrompt" spellcheck="false"></textarea>
+          <button type="button" class="btn ghost" id="resetPrompt" style="margin-top:10px">Rétablir le texte d'origine</button>
+          <p class="note">
+            Les repères <code>IMAGE(...)</code> et le bloc <code>```html</code> sont
+            ce qui déclenche les images et les pages : les retirer désactive ces
+            deux capacités.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Zone sensible</h2>
+          <button type="button" class="btn danger" id="wipeAll">Tout effacer sur cet appareil</button>
+          <p class="note">Clé, conversation et réglages. Irréversible.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav id="nav">
+    <div class="nav-brand">
+      <div class="mark">M</div>
+      <div class="who"><b>Mob</b><small id="navSub">Assistant</small></div>
     </div>
-
-    <!-- Données -->
-    <div class="section">
-      <h3>Données</h3>
-      <p class="hint">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
-      <button type="button" class="danger-btn" id="clearHistory">Effacer la conversation</button>
-    </div>
-
-    <div class="btns">
-      <button type="button" class="ghost" id="closeSettings">Fermer</button>
-      <button type="submit" class="primary">Enregistrer</button>
-    </div>
-
-    <p class="note">
-      Mob · <a href="https://github.com/guiidlf-sys/Mob" target="_blank" rel="noopener">code source</a>
-    </p>
-  </form>
-</dialog>
+    <button type="button" data-view="chat" aria-current="page"><span class="ico">💬</span>Chat</button>
+    <button type="button" data-view="creations"><span class="ico">🎨</span>Créations</button>
+    <button type="button" data-view="settings"><span class="ico">⚙️</span>Réglages</button>
+    <button type="button" data-view="admin" id="navAdmin" hidden><span class="ico">🛡️</span>Admin</button>
+  </nav>
+</div>
 
 <script>
 (function () {
   "use strict";
 
   var API = "https://api.mistral.ai/v1/chat/completions";
-
-  // Fenêtre de contexte envoyée au modèle — réglable. L'historique complet
-  // reste sur l'appareil ; seule cette tranche part à chaque tour, parce
-  // que la limite du modèle et la place sur le disque sont deux choses
-  // différentes.
-  function contextWindow() { return store.get("mob.ctx", 24); }
-
-  // Nombre de bulles réellement dessinées. Sans plafond, une longue
-  // conversation ralentit chaque envoi.
+  var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
   var DRAWN_MESSAGES = 60;
 
-  var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
-    "Réponds en français, de façon directe et utile. Sois bref quand la " +
-    "question est simple ; développe autant qu'il le faut quand c'est " +
-    "justifié — code, raisonnement technique, explication de fond. " +
-    "Évite les formules de politesse creuses et les listes à puces quand " +
-    "une phrase suffit.\n\n" +
+  var DEFAULT_PROMPT =
+    "Tu es Mob, l'assistant personnel de l'utilisateur. Réponds en français, " +
+    "de façon directe et utile. Sois bref quand la question est simple ; " +
+    "développe autant qu'il le faut quand c'est justifié — code, raisonnement " +
+    "technique, explication de fond. Évite les formules de politesse creuses.\n\n" +
     "Deux capacités particulières :\n" +
     "1. IMAGE — si on te demande de générer, dessiner ou créer une image, " +
     "réponds par une courte phrase puis, sur une ligne seule, " +
-    "IMAGE(description détaillée en anglais). La description anglaise est " +
-    "envoyée telle quelle au générateur : sois précis et visuel.\n" +
-    "2. SITE WEB — si on te demande un site, une page ou une interface, " +
-    "donne un document HTML complet et autonome dans un bloc ```html, " +
-    "styles et scripts compris. Pas de fichiers séparés, pas de " +
-    "dépendances externes : une seule page qui s'ouvre telle quelle.";
+    "IMAGE(description détaillée en anglais). La description anglaise part " +
+    "telle quelle au générateur : sois précis et visuel.\n" +
+    "2. SITE WEB — si on te demande un site, une page ou une interface, donne " +
+    "un document HTML complet et autonome dans un bloc ```html, styles et " +
+    "scripts compris. Pas de fichiers séparés, pas de dépendances externes.";
 
-  // Génération d'images sans clé ni compte (Pollinations) : l'image est
-  // une simple URL, donc un <img> suffit — aucun appel à authentifier.
-  var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
+  var store = {
+    get: function (k, fallback) {
+      try {
+        var v = localStorage.getItem(k);
+        return v === null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set: function (k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé */ }
+    }
+  };
+
+  function contextWindow() { return store.get("mob.ctx", 24); }
+  function systemPrompt() { return store.get("mob.prompt", DEFAULT_PROMPT); }
+  function isAdmin() { return store.get("mob.admin", false); }
+  function adminCode() { return store.get("mob.adminCode", "mob"); }
+
+  var history = store.get("mob.history", []);
+  var busy = false;
+  var pendingQuestion = null;
+
+  var el = function (id) { return document.getElementById(id); };
+  var els = {
+    messages: el("messages"), input: el("input"), send: el("send"), mic: el("mic"),
+    voiceToggle: el("voiceToggle"), nav: el("nav"),
+    hello: el("hello"), helloSub: el("helloSub"), navSub: el("navSub"),
+    adminBadge: el("adminBadge"), navAdmin: el("navAdmin"),
+    accountState: el("accountState"), accountWho: el("accountWho"),
+    keyFields: el("keyFields"), key: el("key"), editKey: el("editKey"), signOut: el("signOut"),
+    themeSeg: el("themeSeg"), sizeSeg: el("sizeSeg"),
+    speakPref: el("speakPref"), rate: el("rate"), rateVal: el("rateVal"),
+    clearHistory: el("clearHistory"),
+    adminUnlock: el("adminUnlock"), adminCodeInput: el("adminCode"),
+    adminEnter: el("adminEnter"), adminLeave: el("adminLeave"), adminSub: el("adminSub"),
+    model: el("model"), ctx: el("ctx"), ctxVal: el("ctxVal"),
+    sysPrompt: el("sysPrompt"), resetPrompt: el("resetPrompt"), wipeAll: el("wipeAll"),
+    creations: el("creations"),
+    statMsgs: el("statMsgs"), statImgs: el("statImgs"), statSites: el("statSites"), statSize: el("statSize")
+  };
+
+  /* ---------- navigation ---------- */
+
+  function show(view) {
+    // L'espace admin n'apparaît pas tant que le mode n'est pas actif : on
+    // rabat sur la conversation plutôt que d'afficher une vue vide.
+    if (view === "admin" && !isAdmin()) view = "chat";
+    var views = document.querySelectorAll(".view");
+    for (var i = 0; i < views.length; i++) {
+      views[i].classList.toggle("active", views[i].id === "view-" + view);
+    }
+    var buttons = els.nav.querySelectorAll("button[data-view]");
+    for (var j = 0; j < buttons.length; j++) {
+      var on = buttons[j].dataset.view === view;
+      if (on) buttons[j].setAttribute("aria-current", "page");
+      else buttons[j].removeAttribute("aria-current");
+    }
+    if (view === "creations") renderCreations();
+    if (view === "admin") renderAdmin();
+    if (view === "settings") syncAccount();
+    store.set("mob.view", view);
+  }
+
+  els.nav.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-view]");
+    if (b) show(b.dataset.view);
+  });
+
+  /* ---------- conversation ---------- */
+
+  var SUGGESTIONS = [
+    "Génère une image de robot jaune",
+    "Programme-moi une page de compteur",
+    "Explique-moi les trous noirs"
+  ];
+
+  function render() {
+    els.messages.innerHTML = "";
+
+    if (!history.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      var big = document.createElement("div");
+      big.className = "big"; big.textContent = "M";
+      empty.appendChild(big);
+      var strong = document.createElement("strong");
+      strong.textContent = "Mob est prêt.";
+      empty.appendChild(strong);
+      var line = document.createElement("div");
+      line.textContent = store.get("mob.key", "")
+        ? "Pose une question, ou touche 🎙 pour parler."
+        : "Commence par ajouter ta clé dans Réglages.";
+      empty.appendChild(line);
+
+      if (store.get("mob.key", "")) {
+        var sg = document.createElement("div");
+        sg.className = "suggest";
+        SUGGESTIONS.forEach(function (s) {
+          var b = document.createElement("button");
+          b.type = "button"; b.textContent = s;
+          b.addEventListener("click", function () { unlockSpeech(); ask(s); });
+          sg.appendChild(b);
+        });
+        empty.appendChild(sg);
+      }
+      els.messages.appendChild(empty);
+      return;
+    }
+
+    // Seules les dernières bulles sont dessinées : redessiner mille messages
+    // à chaque tour finirait par rendre la saisie poussive. L'historique
+    // complet reste stocké et continue d'alimenter le modèle.
+    var shown = history.slice(-DRAWN_MESSAGES);
+    if (history.length > shown.length) {
+      var older = document.createElement("div");
+      older.className = "older";
+      older.textContent = (history.length - shown.length) +
+        " messages plus anciens — conservés, mais non affichés";
+      els.messages.appendChild(older);
+    }
+    shown.forEach(function (m) { els.messages.appendChild(renderMessage(m)); });
+    scrollDown();
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(function () {
+      var s = els.messages.parentElement;
+      s.scrollTop = s.scrollHeight;
+    });
+  }
+
+  function renderMessage(m) {
+    var d = document.createElement("div");
+    d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
+    if (m.role !== "assistant") { d.textContent = m.content; return d; }
+
+    var text = m.content;
+    var image = text.match(/IMAGE\(([^)]+)\)/i);
+    if (image) text = text.replace(image[0], "").trim();
+
+    var code = extractHtml(text);
+    // Un document HTML entier dans une bulle est illisible sur téléphone.
+    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
+
+    if (text) {
+      var body = document.createElement("div");
+      body.textContent = text;
+      d.appendChild(body);
+    }
+    if (image) d.appendChild(imageBlock(image[1].trim()));
+    if (code) d.appendChild(siteBlock(code));
+    return d;
+  }
+
+  function extractHtml(text) {
+    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
+    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
+    return null;
+  }
 
   // Graine dérivée du texte : la même description redonne la même image,
-  // sinon chaque redessin de la conversation en générerait une nouvelle.
+  // sinon chaque redessin en générerait une nouvelle.
   function seedOf(s) {
     var h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
@@ -418,142 +716,19 @@
       "?width=768&height=768&nologo=true&seed=" + seedOf(prompt);
   }
 
-  var store = {
-    get: function (k, fallback) {
-      try {
-        var v = localStorage.getItem(k);
-        return v === null ? fallback : JSON.parse(v);
-      } catch (e) { return fallback; }
-    },
-    set: function (k, v) {
-      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé : on continue sans persistance */ }
-    }
-  };
-
-  var history = store.get("mob.history", []);
-  var busy = false;
-  var pendingQuestion = null;
-
-  var els = {
-    messages: document.getElementById("messages"),
-    input: document.getElementById("input"),
-    send: document.getElementById("send"),
-    mic: document.getElementById("mic"),
-    voiceToggle: document.getElementById("voiceToggle"),
-    settings: document.getElementById("settings"),
-    openSettings: document.getElementById("openSettings"),
-    settingsForm: document.getElementById("settingsForm"),
-    key: document.getElementById("key"),
-    model: document.getElementById("model"),
-    speakPref: document.getElementById("speakPref"),
-    clearHistory: document.getElementById("clearHistory"),
-    accountState: document.getElementById("accountState"),
-    accountWho: document.getElementById("accountWho"),
-    keyFields: document.getElementById("keyFields"),
-    editKey: document.getElementById("editKey"),
-    signOut: document.getElementById("signOut"),
-    closeSettings: document.getElementById("closeSettings"),
-    themeSeg: document.getElementById("themeSeg"),
-    sizeSeg: document.getElementById("sizeSeg"),
-    rate: document.getElementById("rate"),
-    rateVal: document.getElementById("rateVal"),
-    ctx: document.getElementById("ctx"),
-    ctxVal: document.getElementById("ctxVal")
-  };
-
-  /* ---------- rendu ---------- */
-
-  function render() {
-    els.messages.innerHTML = "";
-
-    if (!history.length) {
-      var empty = document.createElement("div");
-      empty.className = "empty";
-      empty.innerHTML = "<strong>Mob est prêt.</strong>" +
-        (store.get("mob.key", "") ? "Pose une question, ou touche 🎙 pour parler."
-                                  : "Commence par ajouter ta clé d'API dans ⚙.");
-      els.messages.appendChild(empty);
-      return;
-    }
-
-    // Seules les dernières bulles sont dessinées : redessiner mille
-    // messages à chaque tour finirait par rendre la saisie poussive.
-    // L'historique complet reste stocké et continue d'alimenter le modèle.
-    var shown = history.slice(-DRAWN_MESSAGES);
-    if (history.length > shown.length) {
-      var older = document.createElement("div");
-      older.className = "older";
-      older.textContent = (history.length - shown.length) +
-        " messages plus anciens — conservés, mais non affichés";
-      els.messages.appendChild(older);
-    }
-    shown.forEach(function (m) {
-      els.messages.appendChild(renderMessage(m));
-    });
-
-    scrollDown();
-  }
-
-  /**
-   * Une bulle de conversation. Les réponses de Mob peuvent contenir deux
-   * choses que du texte brut ne rend pas : un marqueur IMAGE(...) — même
-   * convention que le CALC(...) de la version Python — et une page HTML
-   * complète. Les deux sont extraits du texte affiché et remplacés par
-   * quelque chose d'utilisable : l'image elle-même, ou des boutons.
-   */
-  function renderMessage(m) {
-    var d = document.createElement("div");
-    d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
-
-    if (m.role !== "assistant") {
-      d.textContent = m.content;
-      return d;
-    }
-
-    var text = m.content;
-    var image = text.match(/IMAGE\(([^)]+)\)/i);
-    if (image) text = text.replace(image[0], "").trim();
-
-    var code = extractHtml(text);
-    // Un document HTML entier dans une bulle est illisible sur téléphone :
-    // on le retire du texte, il reste accessible par les boutons.
-    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
-
-    if (text) {
-      var body = document.createElement("div");
-      body.textContent = text;
-      d.appendChild(body);
-    }
-    if (image) d.appendChild(imageBlock(image[1].trim()));
-    if (code) d.appendChild(siteBlock(code));
-
-    return d;
-  }
-
-  function extractHtml(text) {
-    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
-    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
-    return null;
-  }
-
   function imageBlock(prompt) {
     var wrap = document.createElement("div");
     wrap.className = "gen";
-
     var img = document.createElement("img");
-    img.alt = prompt;
-    img.loading = "lazy";
-    img.src = imageURL(prompt);
+    img.alt = prompt; img.loading = "lazy"; img.src = imageURL(prompt);
     img.onerror = function () {
       wrap.className = "gen-fail";
-      wrap.textContent = "Image indisponible — le service gratuit est limité " +
-        "à environ une image toutes les 15 secondes. Réessaie dans un instant.";
+      wrap.textContent = "Image indisponible — le service gratuit est limité à " +
+        "environ une image toutes les 15 secondes. Réessaie dans un instant.";
     };
     wrap.appendChild(img);
-
     var cap = document.createElement("div");
-    cap.className = "cap";
-    cap.textContent = prompt;
+    cap.className = "cap"; cap.textContent = prompt;
     wrap.appendChild(cap);
     return wrap;
   }
@@ -561,32 +736,24 @@
   function siteBlock(code) {
     var wrap = document.createElement("div");
     wrap.className = "gen-actions";
-
     function button(label, fn) {
       var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = label;
+      b.type = "button"; b.textContent = label;
       b.addEventListener("click", fn);
       wrap.appendChild(b);
       return b;
     }
-
     button("👁 Aperçu", function () {
       var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
       window.open(url, "_blank");
-      // Laisser le temps à l'onglet de charger avant de libérer l'URL.
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
     });
-
     button("⬇ Enregistrer", function () {
       var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
       var a = document.createElement("a");
-      a.href = url;
-      a.download = "site.html";
-      a.click();
+      a.href = url; a.download = "site.html"; a.click();
       setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
     });
-
     var copy = button("⧉ Copier le code", function () {
       if (!navigator.clipboard) return;
       navigator.clipboard.writeText(code).then(function () {
@@ -594,23 +761,15 @@
         setTimeout(function () { copy.textContent = "⧉ Copier le code"; }, 1600);
       });
     });
-
     return wrap;
   }
 
-  function scrollDown() {
-    requestAnimationFrame(function () {
-      els.messages.scrollTop = els.messages.scrollHeight;
-    });
-  }
-
   function showThinking(on) {
-    var existing = document.getElementById("thinking");
+    var existing = el("thinking");
     if (existing) existing.remove();
     if (!on) return;
     var d = document.createElement("div");
-    d.className = "thinking";
-    d.id = "thinking";
+    d.className = "thinking"; d.id = "thinking";
     d.innerHTML = "Mob réfléchit <span>·</span><span>·</span><span>·</span>";
     els.messages.appendChild(d);
     scrollDown();
@@ -622,16 +781,16 @@
     render();
   }
 
-  /* ---------- appel API ---------- */
+  /* ---------- appel au modèle ---------- */
 
   function ask(text) {
     var key = store.get("mob.key", "");
     if (!key) {
-      push("error", "Aucune clé d'API. Touche ⚙ pour en ajouter une.");
-      els.settings.showModal();
+      pendingQuestion = text;
+      show("settings");
       return;
     }
-
+    show("chat");
     push("user", text);
     busy = true;
     els.send.disabled = true;
@@ -642,27 +801,23 @@
       .slice(-contextWindow())
       .map(function (m) { return { role: m.role, content: m.content }; });
 
-    var payload = {
-      model: store.get("mob.model", "mistral-small-latest"),
-      messages: [{ role: "system", content: SYSTEM }].concat(recent)
-    };
-
     fetch(API, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + key
-      },
-      body: JSON.stringify(payload)
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify({
+        model: store.get("mob.model", "mistral-small-latest"),
+        messages: [{ role: "system", content: systemPrompt() }].concat(recent)
+      })
     })
       .then(function (res) {
         return res.json().catch(function () { return null; }).then(function (data) {
           if (!res.ok) {
-            var detail = (data && (data.detail || data.message)) || ("erreur " + res.status);
+            var detail = (data && data.detail) || ("erreur " + res.status);
             if (typeof detail === "object") detail = JSON.stringify(detail);
             throw new Error(
-              res.status === 401 ? "Clé d'API refusée. Vérifie-la dans ⚙."
-              : res.status === 429 ? "Trop de requêtes d'un coup (limite du palier gratuit). Attends un instant."
+              res.status === 401 || res.status === 403
+                ? "Clé d'API refusée. Vérifie-la dans Réglages."
+              : res.status === 429 ? "Trop de requêtes d'un coup. Attends un instant."
               : detail
             );
           }
@@ -681,21 +836,17 @@
         // Dégradation propre : un message lisible, jamais une page cassée.
         showThinking(false);
         push("error", err && err.message ? err.message
-                                         : "Impossible de joindre Mistral. Vérifie ta connexion.");
+                                         : "Impossible de joindre le serveur. Vérifie ta connexion.");
       })
-      .then(function () {
-        busy = false;
-        els.send.disabled = false;
-      });
+      .then(function () { busy = false; els.send.disabled = false; });
   }
 
-  /* ---------- synthèse vocale ---------- */
+  /* ---------- voix ---------- */
 
   var speechUnlocked = false;
 
   // iOS n'autorise la synthèse vocale que si elle a d'abord été déclenchée
-  // par un geste de l'utilisateur. On la « débloque » silencieusement au
-  // premier appui, sinon les réponses arrivent muettes.
+  // par un geste : sans ce déblocage, les réponses arrivent muettes.
   function unlockSpeech() {
     if (speechUnlocked || !("speechSynthesis" in window)) return;
     try {
@@ -717,22 +868,16 @@
     } catch (e) { /* idem */ }
   }
 
-  /* ---------- reconnaissance vocale ---------- */
-
   var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recog = null;
-  var listening = false;
+  var recog = null, listening = false;
 
   if (!Recognition) {
-    // Safari iOS ne l'expose pas partout : on garde la saisie au clavier,
-    // qui elle marche toujours.
     els.mic.style.display = "none";
   } else {
     recog = new Recognition();
     recog.lang = "fr-FR";
     recog.interimResults = true;
     recog.continuous = false;
-
     recog.onresult = function (e) {
       var t = "";
       for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
@@ -749,19 +894,12 @@
 
   function startListening() {
     if (!recog || listening) return;
-    try {
-      recog.start();
-      listening = true;
-      els.mic.classList.add("listening");
-    } catch (e) { stopListening(); }
+    try { recog.start(); listening = true; els.mic.classList.add("listening"); }
+    catch (e) { stopListening(); }
   }
+  function stopListening() { listening = false; els.mic.classList.remove("listening"); }
 
-  function stopListening() {
-    listening = false;
-    els.mic.classList.remove("listening");
-  }
-
-  /* ---------- événements ---------- */
+  /* ---------- saisie ---------- */
 
   function autosize() {
     els.input.style.height = "auto";
@@ -786,38 +924,21 @@
     listening ? recog.stop() : startListening();
   });
 
-  els.voiceToggle.addEventListener("click", function () {
-    unlockSpeech();
-    var on = !store.get("mob.speak", false);
-    store.set("mob.speak", on);
-    syncVoiceButton();
-    if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
-  });
-
-  function syncVoiceButton() {
-    var on = store.get("mob.speak", false);
-    els.voiceToggle.setAttribute("aria-pressed", on ? "true" : "false");
-    els.voiceToggle.textContent = on ? "🔊" : "🔈";
-    els.speakPref.checked = on;
-  }
-
   /* ---------- apparence ---------- */
 
   var systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
-  // « auto » n'est pas une valeur CSS : on la résout ici en interrogeant le
-  // système, et on repose data-theme en dur pour que la feuille de style
-  // n'ait que deux cas à connaître.
+  // « auto » n'est pas une valeur CSS : on la résout ici et on repose
+  // data-theme en dur, pour que la feuille de style n'ait que deux cas.
   function applyTheme() {
     var choice = store.get("mob.theme", "auto");
     var dark = choice === "dark" || (choice === "auto" && (!systemDark || systemDark.matches));
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#0d0f14" : "#f6f7f9");
-    syncSeg(els.themeSeg, "theme-choice", choice);
+    if (meta) meta.setAttribute("content", dark ? "#08070d" : "#ece8f4");
+    syncSeg(els.themeSeg, "themeChoice", choice);
   }
 
-  // Si le réglage est « auto », suivre le système quand il bascule.
   if (systemDark && systemDark.addEventListener) {
     systemDark.addEventListener("change", function () {
       if (store.get("mob.theme", "auto") === "auto") applyTheme();
@@ -830,19 +951,12 @@
     syncSeg(els.sizeSeg, "size", String(px));
   }
 
-  // Un groupe de boutons se comporte comme un choix unique : un seul
-  // aria-pressed à true, qui sert aussi de style d'état sélectionné.
-  function syncSeg(group, attr, value) {
+  function syncSeg(group, key, value) {
     if (!group) return;
     var buttons = group.querySelectorAll("button");
     for (var i = 0; i < buttons.length; i++) {
-      var b = buttons[i];
-      b.setAttribute("aria-pressed", b.dataset[camel(attr)] === value ? "true" : "false");
+      buttons[i].setAttribute("aria-pressed", buttons[i].dataset[key] === value ? "true" : "false");
     }
-  }
-
-  function camel(s) {
-    return s.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
   }
 
   els.themeSeg.addEventListener("click", function (e) {
@@ -865,22 +979,37 @@
     var key = store.get("mob.key", "");
     var connected = !!key;
     els.accountState.className = "state" + (connected ? " on" : "");
-    els.accountWho.innerHTML = "";
-    els.accountWho.appendChild(document.createTextNode(connected ? "Connecté" : "Non connecté"));
+    els.accountWho.textContent = connected ? "Connecté" : "Non connecté";
     var small = document.createElement("small");
+    // Ne jamais réafficher la clé : un repère suffit à la reconnaître.
     small.textContent = connected
-      // Ne jamais réafficher la clé, même partiellement masquée : un repère
-      // suffit à reconnaître laquelle est en place.
       ? "Clé ···" + key.slice(-4) + " — retenue sur cet appareil"
       : "Ajoute ta clé pour commencer";
     els.accountWho.appendChild(small);
 
     els.editKey.hidden = !connected;
     els.signOut.hidden = !connected;
-    // Une fois connecté, le champ disparaît : c'est ce qui fait qu'on ne
-    // redemande plus la clé à chaque ouverture des réglages.
+    // Le champ disparaît une fois connecté : c'est ce qui fait qu'on ne
+    // redemande plus la clé à chaque passage dans les réglages.
     els.keyFields.hidden = connected;
   }
+
+  // Enregistrement immédiat : plus de bouton « Enregistrer » global, donc
+  // plus de risque qu'il réécrive la clé depuis un champ vide.
+  els.key.addEventListener("change", function () {
+    var typed = els.key.value.trim();
+    if (!typed) return;
+    store.set("mob.key", typed);
+    els.key.value = "";
+    syncAccount();
+    render();
+    if (pendingQuestion) {
+      var q = pendingQuestion;
+      pendingQuestion = null;
+      unlockSpeech();
+      ask(q);
+    }
+  });
 
   els.editKey.addEventListener("click", function () {
     els.keyFields.hidden = false;
@@ -895,62 +1024,35 @@
     store.set("mob.history", history);
     syncAccount();
     render();
-    els.settings.close();
+    show("chat");
   });
 
-  /* ---------- curseurs ---------- */
+  /* ---------- voix : réglages ---------- */
 
-  function rateLabel(v) {
-    return v < 0.85 ? "lente" : v > 1.15 ? "rapide" : "normale";
+  function syncVoice() {
+    var on = store.get("mob.speak", false);
+    els.voiceToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    els.voiceToggle.textContent = on ? "🔊" : "🔈";
+    els.speakPref.setAttribute("aria-pressed", on ? "true" : "false");
+    els.speakPref.textContent = on ? "Oui" : "Non";
   }
+
+  function toggleVoice() {
+    unlockSpeech();
+    var on = !store.get("mob.speak", false);
+    store.set("mob.speak", on);
+    syncVoice();
+    if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+  }
+
+  els.voiceToggle.addEventListener("click", toggleVoice);
+  els.speakPref.addEventListener("click", toggleVoice);
+
+  function rateLabel(v) { return v < 0.85 ? "lente" : v > 1.15 ? "rapide" : "normale"; }
 
   els.rate.addEventListener("input", function () {
     els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
-  });
-
-  els.ctx.addEventListener("input", function () {
-    els.ctxVal.textContent = els.ctx.value + " messages";
-  });
-
-  /* ---------- ouverture / enregistrement ---------- */
-
-  els.openSettings.addEventListener("click", function () {
-    els.key.value = "";
-    els.model.value = store.get("mob.model", "mistral-small-latest");
-    els.speakPref.checked = store.get("mob.speak", false);
-    els.rate.value = store.get("mob.rate", 1);
-    els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
-    els.ctx.value = contextWindow();
-    els.ctxVal.textContent = els.ctx.value + " messages";
-    syncAccount();
-    applyTheme();
-    applySize();
-    els.settings.showModal();
-  });
-
-  els.closeSettings.addEventListener("click", function () { els.settings.close(); });
-
-  els.settingsForm.addEventListener("submit", function () {
-    // Champ vide alors qu'une clé existe = « je n'y touche pas », sinon
-    // rouvrir les réglages pour changer le thème effacerait la clé.
-    var typed = els.key.value.trim();
-    if (typed) store.set("mob.key", typed);
-
-    store.set("mob.model", els.model.value);
-    store.set("mob.speak", els.speakPref.checked);
     store.set("mob.rate", parseFloat(els.rate.value));
-    store.set("mob.ctx", parseInt(els.ctx.value, 10));
-    syncVoiceButton();
-    syncAccount();
-    render();
-
-    // Une question dictée en attente part maintenant que la clé existe.
-    if (pendingQuestion && store.get("mob.key", "")) {
-      var q = pendingQuestion;
-      pendingQuestion = null;
-      unlockSpeech();
-      ask(q);
-    }
   });
 
   els.clearHistory.addEventListener("click", function () {
@@ -958,31 +1060,172 @@
     history = [];
     store.set("mob.history", history);
     render();
-    els.settings.close();
+    show("chat");
   });
+
+  /* ---------- espace admin ---------- */
+
+  function syncAdmin() {
+    var on = isAdmin();
+    els.navAdmin.hidden = !on;
+    els.adminBadge.hidden = !on;
+    els.adminUnlock.hidden = on;
+    els.adminLeave.hidden = !on;
+    els.adminSub.textContent = on
+      ? "Mode administrateur actif."
+      : "Réservé au propriétaire de l'instance.";
+    els.hello.textContent = on ? "Mob · Admin" : "Mob";
+    els.helloSub.textContent = on ? "Console d'administration" : "Ton assistant personnel";
+    els.navSub.textContent = on ? "Admin" : "Assistant";
+    if (!on) show(store.get("mob.view", "chat") === "admin" ? "chat" : store.get("mob.view", "chat"));
+  }
+
+  els.adminEnter.addEventListener("click", function () {
+    if (els.adminCodeInput.value !== adminCode()) {
+      els.adminCodeInput.value = "";
+      alert("Code incorrect.");
+      return;
+    }
+    els.adminCodeInput.value = "";
+    store.set("mob.admin", true);
+    syncAdmin();
+    show("admin");
+  });
+
+  els.adminLeave.addEventListener("click", function () {
+    store.set("mob.admin", false);
+    syncAdmin();
+    show("chat");
+  });
+
+  els.model.addEventListener("change", function () { store.set("mob.model", els.model.value); });
+
+  els.ctx.addEventListener("input", function () {
+    els.ctxVal.textContent = els.ctx.value + " messages";
+    store.set("mob.ctx", parseInt(els.ctx.value, 10));
+  });
+
+  els.sysPrompt.addEventListener("change", function () {
+    store.set("mob.prompt", els.sysPrompt.value.trim() || DEFAULT_PROMPT);
+  });
+
+  els.resetPrompt.addEventListener("click", function () {
+    store.set("mob.prompt", DEFAULT_PROMPT);
+    els.sysPrompt.value = DEFAULT_PROMPT;
+  });
+
+  els.wipeAll.addEventListener("click", function () {
+    if (!confirm("Tout effacer : clé, conversation et réglages ?")) return;
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf("mob.") === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* rien à faire de plus */ }
+    location.href = location.pathname;
+  });
+
+  function renderAdmin() {
+    els.model.value = store.get("mob.model", "mistral-small-latest");
+    els.ctx.value = contextWindow();
+    els.ctxVal.textContent = els.ctx.value + " messages";
+    els.sysPrompt.value = systemPrompt();
+
+    var images = 0, sites = 0;
+    history.forEach(function (m) {
+      if (m.role !== "assistant") return;
+      if (/IMAGE\([^)]+\)/i.test(m.content)) images++;
+      if (extractHtml(m.content)) sites++;
+    });
+    els.statMsgs.textContent = history.length;
+    els.statImgs.textContent = images;
+    els.statSites.textContent = sites;
+
+    var bytes = 0;
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf("mob.") === 0; })
+        .forEach(function (k) { bytes += (localStorage.getItem(k) || "").length; });
+    } catch (e) { /* stockage illisible */ }
+    els.statSize.textContent = bytes > 1024
+      ? (bytes / 1024).toFixed(1) + " Ko"
+      : bytes + " o";
+  }
+
+  /* ---------- créations ---------- */
+
+  function renderCreations() {
+    els.creations.innerHTML = "";
+    var images = [], sites = [];
+    history.forEach(function (m) {
+      if (m.role !== "assistant") return;
+      var img = m.content.match(/IMAGE\(([^)]+)\)/i);
+      if (img) images.push(img[1].trim());
+      var code = extractHtml(m.content);
+      if (code) sites.push(code);
+    });
+
+    if (!images.length && !sites.length) {
+      var p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "Rien pour l'instant. Demande une image ou une page à Mob, " +
+        "et tu les retrouveras ici.";
+      els.creations.appendChild(p);
+      return;
+    }
+
+    if (images.length) {
+      var grid = document.createElement("div");
+      grid.className = "grid";
+      images.slice(-24).reverse().forEach(function (prompt) {
+        var tile = document.createElement("div");
+        tile.className = "tile";
+        var im = document.createElement("img");
+        im.loading = "lazy"; im.alt = prompt; im.src = imageURL(prompt);
+        tile.appendChild(im);
+        var lab = document.createElement("div");
+        lab.className = "lab"; lab.textContent = prompt;
+        tile.appendChild(lab);
+        grid.appendChild(tile);
+      });
+      els.creations.appendChild(grid);
+    }
+
+    sites.slice(-12).reverse().forEach(function (code) {
+      var wrap = document.createElement("div");
+      wrap.style.marginTop = "14px";
+      var t = document.createElement("div");
+      t.className = "lab";
+      t.textContent = "Page web générée — " + Math.round(code.length / 1024) + " Ko";
+      wrap.appendChild(t);
+      wrap.appendChild(siteBlock(code));
+      els.creations.appendChild(wrap);
+    });
+  }
 
   /* ---------- démarrage ---------- */
 
   applyTheme();
   applySize();
-  syncVoiceButton();
+  syncVoice();
+  syncAccount();
+  syncAdmin();
+  els.rate.value = store.get("mob.rate", 1);
+  els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
   render();
 
   // Question passée dans l'adresse : ?q=... — c'est par là qu'arrive le
   // raccourci Siri, qui dicte puis ouvre Mob avec la question déjà posée.
-  // On la retire de l'URL aussitôt, sinon un simple rechargement de la
-  // page la reposerait indéfiniment.
+  // On la retire de l'URL aussitôt, sinon un rechargement la reposerait.
   var asked = new URLSearchParams(location.search).get("q");
   if (asked) window.history.replaceState(null, "", location.pathname);
 
-  if (!store.get("mob.key", "")) {
-    // Question dictée avant d'avoir configuré la clé : on la garde de côté
-    // au lieu de la perdre, et on la pose dès que la clé est enregistrée.
-    if (asked && asked.trim()) pendingQuestion = asked.trim();
-    els.settings.showModal();
-  } else if (asked && asked.trim()) {
+  if (asked && asked.trim()) {
     unlockSpeech();
-    ask(asked.trim());
+    ask(asked.trim());          // ask() met la question de côté s'il manque la clé
+  } else if (!store.get("mob.key", "")) {
+    show("settings");
+  } else {
+    show(store.get("mob.view", "chat"));
   }
 })();
 </script>

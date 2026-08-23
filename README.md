@@ -33,7 +33,10 @@ prix de gros détours :
   disque sont deux limites différentes.
 - **Voix dans les deux sens** : dictée (là où le navigateur la propose)
   et lecture à voix haute des réponses, activable par le bouton 🔊.
-- **Marche aussi sur le Mac**, même adresse.
+- **Marche aussi sur le Mac** — la navigation devient une barre latérale
+  sur grand écran, et reste en bas sur téléphone.
+- **Galerie des créations** : toutes les images et pages produites au fil
+  des conversations, regroupées dans un onglet.
 - **Génère des images** — demande-en une, Mob l'affiche. Sans clé ni
   compte : le service ([Pollinations](https://pollinations.ai)) sert
   l'image par simple URL, donc une balise `<img>` suffit. Contrepartie :
@@ -54,6 +57,23 @@ développeur, aucune péremption à 7 jours — voir
 C'est le seul chemin vocal gratuit, et iOS 27 ne l'a pas changé : SiriKit
 y est retiré au profit des App Intents, mais ceux-ci exigent toujours
 l'autorisation Siri, réservée au compte Apple Developer payant.
+
+### Deux espaces : utilisateur et administrateur
+
+L'interface est séparée en deux. Un visiteur ordinaire voit **Chat**,
+**Créations** et **Réglages** (thème, taille du texte, voix, effacer la
+conversation). Le propriétaire ouvre en plus un onglet **Admin** avec ce
+qui engage le coût ou le comportement : choix du modèle, profondeur de
+mémoire, texte de personnalité, statistiques, effacement total.
+
+⚠️ **Cette séparation range l'interface, elle ne la protège pas.** Mob est
+une page web : son code est lisible par quiconque, donc rien de ce qui
+est masqué ici n'est réellement inaccessible. Le code d'accès évite
+qu'un utilisateur de passage dérègle le modèle, rien de plus. Une vraie
+séparation de droits demanderait un serveur.
+
+Code par défaut : `mob` — modifiable via la clé `mob.adminCode` du
+stockage local.
 
 ### Réglages
 

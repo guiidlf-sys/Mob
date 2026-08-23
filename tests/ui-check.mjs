@@ -4,8 +4,8 @@
  *   node tests/ui-check.mjs [url]
  *
  * Sans argument, teste le site en ligne. Chaque contrôle pilote un vrai
- * navigateur : les boutons sont réellement cliqués, et l'effet attendu
- * est vérifié dans la page — pas seulement leur présence dans le HTML.
+ * navigateur : les boutons sont réellement cliqués, et l'effet obtenu est
+ * vérifié dans la page — pas seulement leur présence dans le HTML.
  *
  * Sort en code 1 si quoi que ce soit échoue, pour que l'intégration
  * continue le remarque.
@@ -16,8 +16,7 @@ const URL_BASE = process.argv[2] || "https://guiidlf-sys.github.io/Mob/";
 
 const results = [];
 let currentGroup = "général";
-
-function group(name) { currentGroup = name; }
+const group = (name) => { currentGroup = name; };
 
 async function check(label, fn) {
   try {
@@ -32,9 +31,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-// MOB_CHROMIUM permet de désigner un Chromium déjà présent, quand la
-// version installée de Playwright ne correspond pas à celle qu'il
-// téléchargerait. Sans la variable, comportement normal.
+// MOB_CHROMIUM désigne un Chromium déjà présent, quand la version
+// installée de Playwright ne correspond pas à celle qu'il téléchargerait.
 const browser = await chromium.launch(
   process.env.MOB_CHROMIUM ? { executablePath: process.env.MOB_CHROMIUM } : {}
 );
@@ -49,9 +47,25 @@ const page = await context.newPage();
 const jsErrors = [];
 page.on("pageerror", (e) => jsErrors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") jsErrors.push(m.text()); });
-
-// Les confirmations bloquent le navigateur tant qu'on n'y répond pas.
 page.on("dialog", (d) => d.accept());
+
+/** Passe dans une vue par la barre de navigation, comme le ferait un doigt. */
+const go = async (view) => {
+  await page.click(`nav button[data-view="${view}"]`);
+  await page.waitForSelector(`#view-${view}.active`, { timeout: 4000 });
+};
+
+/** Enregistre une clé : la sauvegarde se fait à la validation du champ. */
+const setKey = async (value) => {
+  await go("settings");
+  if (await page.locator("#keyFields").isHidden()) await page.click("#editKey");
+  await page.fill("#key", value);
+  await page.locator("#key").dispatchEvent("change");
+};
+
+const seed = (state) => page.evaluate((s) => {
+  for (const [k, v] of Object.entries(s)) localStorage.setItem(k, JSON.stringify(v));
+}, state);
 
 await page.goto(URL_BASE, { waitUntil: "domcontentloaded" });
 
@@ -63,8 +77,8 @@ await check("la page répond et s'intitule « Mob »", async () => {
 });
 
 await check("les éléments de l'écran principal sont là", async () => {
-  for (const id of ["#messages", "#composer", "#input", "#send", "#openSettings", "#voiceToggle"]) {
-    assert(await page.locator(id).count() === 1, `${id} introuvable`);
+  for (const sel of ["#messages", "#composer", "#input", "#send", "#voiceToggle", "nav"]) {
+    assert(await page.locator(sel).count() === 1, `${sel} introuvable`);
   }
 });
 
@@ -73,45 +87,47 @@ await check("un thème est appliqué dès le chargement", async () => {
   assert(theme === "dark" || theme === "light", `data-theme = ${theme}`);
 });
 
-/* ------------------------------------------------------------------ */
-group("réglages");
-
-await check("l'engrenage ouvre les réglages", async () => {
-  // Sans clé, la fenêtre s'ouvre déjà seule au chargement.
-  if (!(await page.locator("#settings").evaluate((d) => d.open))) {
-    await page.click("#openSettings");
-  }
-  assert(await page.locator("#settings").evaluate((d) => d.open), "la fenêtre ne s'est pas ouverte");
+await check("sans clé, l'app conduit vers les réglages", async () => {
+  assert(await page.locator("#view-settings.active").count() === 1,
+    "la vue Réglages devrait être ouverte au premier lancement");
 });
 
-await check("les cinq sections sont présentes", async () => {
-  const titles = await page.locator(".section > h3").allTextContents();
-  for (const expected of ["Compte", "Apparence", "Voix", "Conversation", "Données"]) {
-    assert(titles.includes(expected), `section « ${expected} » absente (vu : ${titles.join(", ")})`);
+/* ------------------------------------------------------------------ */
+group("navigation");
+
+await check("les trois vues de base s'ouvrent", async () => {
+  for (const view of ["chat", "creations", "settings"]) {
+    await go(view);
+    assert(await page.locator(`#view-${view}.active`).count() === 1, `vue ${view} inactive`);
   }
+});
+
+await check("une seule vue est visible à la fois", async () => {
+  assert(await page.locator(".view.active").count() === 1, "plusieurs vues actives simultanément");
+});
+
+await check("l'onglet courant est signalé", async () => {
+  await go("chat");
+  const marked = await page.locator('nav button[aria-current="page"]').count();
+  assert(marked === 1, `${marked} onglets marqués comme courants`);
 });
 
 /* ------------------------------------------------------------------ */
 group("thème");
 
-for (const [choice, expected] of [["light", "light"], ["dark", "dark"]]) {
+for (const choice of ["light", "dark"]) {
   await check(`le bouton thème « ${choice} » change réellement l'apparence`, async () => {
+    await go("settings");
     await page.click(`#themeSeg button[data-theme-choice="${choice}"]`);
-    const theme = await page.getAttribute("html", "data-theme");
-    assert(theme === expected, `attendu ${expected}, obtenu ${theme}`);
-    const pressed = await page.getAttribute(`#themeSeg button[data-theme-choice="${choice}"]`, "aria-pressed");
-    assert(pressed === "true", "le bouton ne s'affiche pas comme sélectionné");
+    assert(await page.getAttribute("html", "data-theme") === choice,
+      `attendu ${choice}, obtenu ${await page.getAttribute("html", "data-theme")}`);
+    assert(await page.getAttribute(`#themeSeg button[data-theme-choice="${choice}"]`, "aria-pressed") === "true",
+      "le bouton ne s'affiche pas comme sélectionné");
   });
 }
 
-await check("le fond suit vraiment le thème clair", async () => {
-  await page.click('#themeSeg button[data-theme-choice="light"]');
-  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  const [r, g, b] = bg.match(/\d+/g).map(Number);
-  assert((r + g + b) / 3 > 180, `fond trop sombre pour un thème clair : ${bg}`);
-});
-
 await check("le thème choisi survit à un rechargement", async () => {
+  await page.click('#themeSeg button[data-theme-choice="light"]');
   await page.reload({ waitUntil: "domcontentloaded" });
   assert(await page.getAttribute("html", "data-theme") === "light", "thème oublié après rechargement");
 });
@@ -120,34 +136,15 @@ await check("le thème choisi survit à un rechargement", async () => {
 group("taille du texte");
 
 await check("les quatre tailles modifient la police", async () => {
-  if (!(await page.locator("#settings").evaluate((d) => d.open))) await page.click("#openSettings");
+  await go("settings");
   const seen = new Set();
   for (const size of ["15", "16", "18", "21"]) {
     await page.click(`#sizeSeg button[data-size="${size}"]`);
-    const fs = await page.evaluate(() =>
-      document.documentElement.style.getPropertyValue("--fs"));
+    const fs = await page.evaluate(() => document.documentElement.style.getPropertyValue("--fs"));
     assert(fs === `${size}px`, `attendu ${size}px, obtenu « ${fs} »`);
     seen.add(fs);
   }
   assert(seen.size === 4, "toutes les tailles ne donnent pas un résultat distinct");
-});
-
-/* ------------------------------------------------------------------ */
-group("curseurs");
-
-await check("la vitesse de lecture met son libellé à jour", async () => {
-  await page.locator("#rate").fill("1.5");
-  await page.locator("#rate").dispatchEvent("input");
-  assert((await page.textContent("#rateVal")) === "rapide", "libellé non mis à jour");
-  await page.locator("#rate").fill("0.6");
-  await page.locator("#rate").dispatchEvent("input");
-  assert((await page.textContent("#rateVal")) === "lente", "libellé non mis à jour");
-});
-
-await check("la mémoire met son libellé à jour", async () => {
-  await page.locator("#ctx").fill("40");
-  await page.locator("#ctx").dispatchEvent("input");
-  assert((await page.textContent("#ctxVal")) === "40 messages", "libellé non mis à jour");
 });
 
 /* ------------------------------------------------------------------ */
@@ -160,11 +157,8 @@ await check("l'état est « Non connecté » sans clé", async () => {
 });
 
 await check("enregistrer une clé connecte le compte", async () => {
-  await page.fill("#key", "cle-de-test-pour-verification");
-  await page.click('#settingsForm button[type="submit"]');
-  await page.click("#openSettings");
-  const txt = await page.textContent("#accountWho");
-  assert(txt.includes("Connecté"), `état affiché : ${txt}`);
+  await setKey("cle-de-test-pour-verification");
+  assert((await page.textContent("#accountWho")).includes("Connecté"), "état non mis à jour");
 });
 
 await check("la clé n'est PLUS redemandée une fois connecté", async () => {
@@ -175,50 +169,135 @@ await check("la clé n'est PLUS redemandée une fois connecté", async () => {
 
 await check("la clé survit à un rechargement (plus jamais redemandée)", async () => {
   await page.reload({ waitUntil: "domcontentloaded" });
-  const opened = await page.locator("#settings").evaluate((d) => d.open);
-  assert(!opened, "les réglages se rouvrent alors qu'une clé est enregistrée");
-  await page.click("#openSettings");
+  await go("settings");
   assert((await page.textContent("#accountWho")).includes("Connecté"), "clé perdue au rechargement");
 });
 
-await check("enregistrer un autre réglage n'efface pas la clé", async () => {
+await check("changer un autre réglage n'efface pas la clé", async () => {
   await page.click('#themeSeg button[data-theme-choice="dark"]');
-  await page.click('#settingsForm button[type="submit"]');
-  await page.click("#openSettings");
+  await page.click('#sizeSeg button[data-size="18"]');
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("settings");
   assert((await page.textContent("#accountWho")).includes("Connecté"),
-    "la clé a été effacée en enregistrant un autre réglage");
+    "la clé a été effacée en changeant un autre réglage");
 });
 
 await check("la déconnexion remet à zéro", async () => {
   await page.click("#signOut");
-  await page.click("#openSettings");
+  await go("settings");
   assert((await page.textContent("#accountWho")).includes("Non connecté"), "toujours connecté après déconnexion");
+});
+
+/* ------------------------------------------------------------------ */
+group("espace admin");
+
+await check("l'onglet Admin est absent par défaut", async () => {
+  assert(await page.locator("#navAdmin").isHidden(), "l'onglet Admin est visible sans déverrouillage");
+  assert(await page.locator("#adminBadge").isHidden(), "le badge Admin est visible sans déverrouillage");
+});
+
+await check("un mauvais code n'ouvre rien", async () => {
+  await go("settings");
+  await page.fill("#adminCode", "mauvais-code");
+  await page.click("#adminEnter");
+  assert(await page.locator("#navAdmin").isHidden(), "l'espace admin s'est ouvert avec un mauvais code");
+});
+
+await check("le bon code ouvre l'espace admin", async () => {
+  await page.fill("#adminCode", "mob");
+  await page.click("#adminEnter");
+  assert(!(await page.locator("#navAdmin").isHidden()), "l'onglet Admin ne s'est pas affiché");
+  assert(!(await page.locator("#adminBadge").isHidden()), "le badge Admin ne s'est pas affiché");
+  assert(await page.locator("#view-admin.active").count() === 1, "la vue Admin ne s'est pas ouverte");
+});
+
+await check("les réglages avancés ne sont QUE dans l'espace admin", async () => {
+  // Modèle, mémoire et personnalité doivent être hors de portée de l'utilisateur simple.
+  for (const sel of ["#model", "#ctx", "#sysPrompt"]) {
+    const inAdmin = await page.locator(`#view-admin ${sel}`).count();
+    assert(inAdmin === 1, `${sel} devrait vivre dans l'espace admin`);
+    assert(await page.locator(`#view-settings ${sel}`).count() === 0,
+      `${sel} ne devrait pas être accessible depuis les réglages utilisateur`);
+  }
+});
+
+await check("les statistiques se remplissent", async () => {
+  await seed({ "mob.history": [
+    { role: "user", content: "dessine" },
+    { role: "assistant", content: "voilà IMAGE(a red cube)" },
+    { role: "assistant", content: "```html\n<!doctype html><h1>Hello</h1>\n```" },
+  ] });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("admin");
+  assert((await page.textContent("#statMsgs")) === "3", "compte de messages faux");
+  assert((await page.textContent("#statImgs")) === "1", "compte d'images faux");
+  assert((await page.textContent("#statSites")) === "1", "compte de pages faux");
+});
+
+await check("la personnalité est modifiable et se rétablit", async () => {
+  await page.fill("#sysPrompt", "Tu es un pirate.");
+  await page.locator("#sysPrompt").dispatchEvent("change");
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.prompt")));
+  assert(saved === "Tu es un pirate.", `prompt non enregistré : ${saved}`);
+  await page.click("#resetPrompt");
+  const back = await page.inputValue("#sysPrompt");
+  assert(back.includes("IMAGE("), "le texte d'origine n'a pas été rétabli");
+});
+
+await check("quitter le mode admin referme l'espace", async () => {
+  await go("settings");
+  await page.click("#adminLeave");
+  assert(await page.locator("#navAdmin").isHidden(), "l'onglet Admin est resté visible");
+  assert(await page.locator("#view-admin.active").count() === 0, "la vue Admin est restée ouverte");
+});
+
+await check("l'espace admin reste fermé après rechargement", async () => {
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert(await page.locator("#navAdmin").isHidden(), "l'onglet Admin revient tout seul");
+});
+
+/* ------------------------------------------------------------------ */
+group("créations");
+
+await check("les images et pages générées sont regroupées", async () => {
+  await go("creations");
+  assert(await page.locator("#creations .tile img").count() >= 1, "aucune image dans la galerie");
+  assert(await page.locator("#creations .gen-actions button").count() >= 3,
+    "les boutons d'une page générée manquent");
 });
 
 /* ------------------------------------------------------------------ */
 group("boutons restants");
 
-await check("« Fermer » ferme les réglages", async () => {
-  if (!(await page.locator("#settings").evaluate((d) => d.open))) await page.click("#openSettings");
-  await page.click("#closeSettings");
-  assert(!(await page.locator("#settings").evaluate((d) => d.open)), "la fenêtre est restée ouverte");
-});
-
-await check("le bouton voix bascule son état", async () => {
+await check("le bouton voix bascule des deux côtés", async () => {
   const before = await page.getAttribute("#voiceToggle", "aria-pressed");
   await page.click("#voiceToggle");
-  const after = await page.getAttribute("#voiceToggle", "aria-pressed");
-  assert(before !== after, "aucun changement d'état");
+  assert(await page.getAttribute("#voiceToggle", "aria-pressed") !== before, "aucun changement d'état");
+  await go("settings");
+  assert(await page.getAttribute("#speakPref", "aria-pressed") !== before,
+    "le réglage Voix ne reflète pas le bouton de l'en-tête");
+  await page.click("#speakPref");
+  assert(await page.getAttribute("#voiceToggle", "aria-pressed") === before,
+    "le bouton de l'en-tête ne reflète pas le réglage");
 });
 
-await check("« Effacer la conversation » est opérant", async () => {
-  await page.click("#openSettings");
-  assert(await page.locator("#clearHistory").isEnabled(), "bouton inactif");
+await check("la vitesse de lecture met son libellé à jour", async () => {
+  await page.locator("#rate").fill("1.5");
+  await page.locator("#rate").dispatchEvent("input");
+  assert((await page.textContent("#rateVal")) === "rapide", "libellé non mis à jour");
+  await page.locator("#rate").fill("0.6");
+  await page.locator("#rate").dispatchEvent("input");
+  assert((await page.textContent("#rateVal")) === "lente", "libellé non mis à jour");
+});
+
+await check("« Effacer la conversation » vide bien la conversation", async () => {
   await page.click("#clearHistory");
-  assert(!(await page.locator("#settings").evaluate((d) => d.open)), "la fenêtre aurait dû se fermer");
+  const left = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.history") || "[]").length);
+  assert(left === 0, `${left} messages restants`);
 });
 
 await check("le bouton d'envoi réagit à la saisie", async () => {
+  await go("chat");
   await page.fill("#input", "bonjour");
   assert(await page.locator("#send").isEnabled(), "bouton d'envoi inactif");
   await page.fill("#input", "");
@@ -228,11 +307,10 @@ await check("le bouton d'envoi réagit à la saisie", async () => {
 group("entrée vocale (?q=)");
 
 await check("une question dans l'URL est posée automatiquement", async () => {
-  await page.evaluate(() => localStorage.setItem("mob.key", JSON.stringify("cle-de-test")));
+  await seed({ "mob.key": "cle-de-test" });
   await page.goto(`${URL_BASE}?q=question%20de%20test`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".msg.user", { timeout: 15000 });
-  const txt = await page.textContent(".msg.user");
-  assert(txt.includes("question de test"), `bulle utilisateur : ${txt}`);
+  assert((await page.textContent(".msg.user")).includes("question de test"), "question non posée");
 });
 
 await check("le paramètre est retiré de l'adresse", async () => {
@@ -241,8 +319,19 @@ await check("le paramètre est retiré de l'adresse", async () => {
 
 await check("une clé invalide donne un message lisible, pas un plantage", async () => {
   await page.waitForSelector(".msg.error", { timeout: 30000 });
-  const txt = await page.textContent(".msg.error");
-  assert(txt.trim().length > 0, "bulle d'erreur vide");
+  assert((await page.textContent(".msg.error")).trim().length > 0, "bulle d'erreur vide");
+});
+
+await check("une question dictée avant la clé n'est pas perdue", async () => {
+  await page.evaluate(() => { localStorage.removeItem("mob.key"); localStorage.removeItem("mob.history"); });
+  await page.goto(`${URL_BASE}?q=question%20avant%20la%20cle`, { waitUntil: "domcontentloaded" });
+  assert(await page.locator("#view-settings.active").count() === 1, "les réglages auraient dû s'ouvrir");
+  await setKey("cle-de-test");
+  await page.waitForSelector(".msg.user", { timeout: 15000 });
+  assert((await page.textContent(".msg.user")).includes("question avant la cle"), "question perdue");
+  // Attendre l'issue de l'appel : une réponse arrivant plus tard
+  // réécrirait l'historique préparé par le contrôle suivant.
+  await page.waitForSelector(".msg.error", { timeout: 30000 });
 });
 
 /* ------------------------------------------------------------------ */
@@ -252,62 +341,35 @@ group("lisibilité et robustesse");
 // ils sont là pour qu'il ne revienne pas.
 
 await check("en thème clair, les bulles se détachent du fond", async () => {
-  await page.evaluate(() => {
-    localStorage.setItem("mob.theme", JSON.stringify("light"));
-    localStorage.setItem("mob.key", JSON.stringify("cle-de-test"));
-    localStorage.setItem("mob.history", JSON.stringify([
-      { role: "user", content: "question" },
-      { role: "assistant", content: "réponse" },
-    ]));
+  await seed({
+    "mob.theme": "light", "mob.key": "cle-de-test",
+    "mob.history": [{ role: "user", content: "question" }, { role: "assistant", content: "réponse" }],
   });
   await page.reload({ waitUntil: "domcontentloaded" });
-
   const lum = (c) => { const [r, g, b] = c.match(/\d+/g).map(Number); return 0.299 * r + 0.587 * g + 0.114 * b; };
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   const bot = await page.evaluate(() => getComputedStyle(document.querySelector(".msg.bot")).backgroundColor);
   const usr = await page.evaluate(() => getComputedStyle(document.querySelector(".msg.user")).backgroundColor);
-
   assert(Math.abs(lum(bot) - lum(bg)) > 6, `bulle Mob indistincte du fond (${bot} sur ${bg})`);
   assert(Math.abs(lum(usr) - lum(bg)) > 6, `bulle utilisateur indistincte du fond (${usr} sur ${bg})`);
 });
 
-await check("les réglages tiennent dans l'écran", async () => {
-  await page.click("#openSettings");
-  const fits = await page.evaluate(() => {
-    const d = document.getElementById("settings");
-    return d.getBoundingClientRect().height <= window.innerHeight + 1;
-  });
-  assert(fits, "la fenêtre de réglages dépasse la hauteur de l'écran");
-  await page.click("#closeSettings");
+await check("rien ne déborde horizontalement", async () => {
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert(overflow <= 1, `${overflow}px de débordement horizontal`);
 });
 
 await check("une conversation très longue ne sature pas l'affichage", async () => {
   await page.evaluate(() => {
     const many = [];
-    for (let i = 0; i < 400; i++) {
-      many.push({ role: i % 2 ? "assistant" : "user", content: "message " + i });
-    }
+    for (let i = 0; i < 400; i++) many.push({ role: i % 2 ? "assistant" : "user", content: "message " + i });
     localStorage.setItem("mob.history", JSON.stringify(many));
   });
   await page.reload({ waitUntil: "domcontentloaded" });
   const drawn = await page.locator(".msg").count();
   assert(drawn > 0 && drawn <= 80, `${drawn} bulles dessinées pour 400 messages`);
   assert(await page.locator(".older").count() === 1, "le repère « messages plus anciens » manque");
-});
-
-await check("une question dictée avant la clé n'est pas perdue", async () => {
-  await page.evaluate(() => {
-    localStorage.removeItem("mob.key");
-    localStorage.removeItem("mob.history");
-  });
-  await page.goto(`${URL_BASE}?q=question%20avant%20la%20cle`, { waitUntil: "domcontentloaded" });
-  assert(await page.locator("#settings").evaluate((d) => d.open), "les réglages auraient dû s'ouvrir");
-
-  await page.fill("#key", "cle-de-test");
-  await page.click('#settingsForm button[type="submit"]');
-  await page.waitForSelector(".msg.user", { timeout: 15000 });
-  const txt = await page.textContent(".msg.user");
-  assert(txt.includes("question avant la cle"), `question perdue (bulle : ${txt})`);
 });
 
 /* ------------------------------------------------------------------ */
