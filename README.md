@@ -48,9 +48,21 @@ L'adresse sera **https://guiidlf-sys.github.io/Mob/**
 
 ### Première utilisation
 
-Ouvre l'adresse, touche ⚙, colle une clé d'API créée sur
-[console.mistral.ai](https://console.mistral.ai) (palier gratuit, sans
-carte bancaire). C'est tout.
+Ouvre l'adresse, touche ⚙, colle une clé d'API, **Enregistrer**.
+
+Pour obtenir la clé sur [console.mistral.ai](https://console.mistral.ai)
+— deux étapes non évidentes que le site ne met pas en avant :
+
+1. Connexion (email, Google ou Apple)
+2. **Vérification par numéro de téléphone** — obligatoire pour activer
+   l'accès API, même gratuit
+3. **Section Billing → sélectionner explicitement le plan gratuit
+   « Experiment »**. Aucune carte bancaire n'est demandée, mais sans ce
+   choix explicite **la clé est créée et ne fonctionne pas** : c'est la
+   cause la plus fréquente d'un « Clé d'API refusée » alors que la clé
+   semble correcte.
+4. **API Keys → Create new key**, puis copier tout de suite — la valeur
+   n'est affichée qu'une seule fois.
 
 ### Où va la clé
 

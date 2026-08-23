@@ -28,9 +28,16 @@ tu voulais que l'app.
 
 ## Étape 1 — la clé d'API (gratuite, sans carte bancaire)
 
-1. Va sur [console.mistral.ai](https://console.mistral.ai), crée un
-   compte, et prends le plan gratuit (« Experiment »).
-2. Crée une clé d'API et copie-la.
+1. Va sur [console.mistral.ai](https://console.mistral.ai) et crée un
+   compte (email, Google ou Apple).
+2. **Vérifie ton numéro de téléphone** — obligatoire pour activer
+   l'accès API, même sur le palier gratuit.
+3. **Section Billing → choisis explicitement le plan gratuit
+   « Experiment »**. Pas de carte bancaire demandée, mais sans ce choix
+   **la clé est créée et ne fonctionne pas** — c'est la cause la plus
+   fréquente d'un « Invalid API Key » sur une clé pourtant correcte.
+4. Crée une clé d'API et copie-la immédiatement : sa valeur n'est
+   affichée qu'une seule fois.
 
 **Cette clé est un mot de passe.** Elle sera écrite en clair dans le
 raccourci. Ne partage jamais ce raccourci avec quelqu'un (le lien
