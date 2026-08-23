@@ -106,7 +106,10 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   fenêtre envoyée au modèle est bornée). Détails, limites et étapes de
   build manuelles dans `mobile/README.md` — à valider sur un Mac (ou
   iPad/service de build cloud, voir README) avant de continuer.
-- **Piste web app — `docs/index.html`, la plus aboutie à ce jour** :
+- **Piste web app — `docs/index.html`, EN LIGNE ET VÉRIFIÉE** :
+  déployée sur **https://guiidlf-sys.github.io/Mob/** (GitHub Pages,
+  branche `main`, dossier `/docs`) — page et icône répondent bien `200`.
+  C'est la piste aboutie ; les autres restent des chantiers.
   page unique autonome (aucune dépendance, aucun build) qui appelle
   l'API Mistral **directement depuis le navigateur** — vérifié que
   `api.mistral.ai` renvoie bien `access-control-allow-origin: *`, donc
