@@ -34,6 +34,26 @@ prix de gros détours :
 - **Voix dans les deux sens** : dictée (là où le navigateur la propose)
   et lecture à voix haute des réponses, activable par le bouton 🔊.
 - **Marche aussi sur le Mac**, même adresse.
+- **Génère des images** — demande-en une, Mob l'affiche. Sans clé ni
+  compte : le service ([Pollinations](https://pollinations.ai)) sert
+  l'image par simple URL, donc une balise `<img>` suffit. Contrepartie :
+  environ une image toutes les 15 secondes, et le service peut être
+  saturé — l'échec est alors affiché, pas silencieux.
+- **Génère des sites web** — demande une page, Mob écrit un document HTML
+  complet et autonome, puis propose **Aperçu**, **Enregistrer** et
+  **Copier le code**. Le code est retiré de la bulle pour rester lisible
+  sur téléphone ; il reste entier derrière les boutons.
+
+### Déclenchement vocal : « Dis Siri, Mob »
+
+Un raccourci iOS de **trois actions** dicte ta question et ouvre Mob
+avec elle déjà posée, via `?q=`. Aucune clé d'API dedans, aucun compte
+développeur, aucune péremption à 7 jours — voir
+[`shortcut/README.md`](shortcut/README.md).
+
+C'est le seul chemin vocal gratuit, et iOS 27 ne l'a pas changé : SiriKit
+y est retiré au profit des App Intents, mais ceux-ci exigent toujours
+l'autorisation Siri, réservée au compte Apple Developer payant.
 
 ### Activer l'hébergement (une seule fois)
 

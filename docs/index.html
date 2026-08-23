@@ -86,6 +86,18 @@
   .msg.bot { align-self: flex-start; background: var(--surface); border-bottom-left-radius: 5px; }
   .msg.error { align-self: stretch; background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; }
 
+  .gen { margin-top: 10px; }
+  .gen img { width: 100%; border-radius: 12px; display: block; background: var(--surface-2); }
+  .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
+  .gen-fail { margin-top: 10px; font-size: 13px; color: var(--danger); }
+
+  .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .gen-actions button {
+    padding: 9px 13px; border-radius: 10px; font: inherit; font-size: 14px;
+    border: 1px solid var(--accent); background: transparent;
+    color: var(--accent); cursor: pointer;
+  }
+
   .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
   .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 17px; }
 
@@ -221,9 +233,36 @@
 
   var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
     "Réponds en français, de façon directe et utile. Sois bref quand la " +
-    "question est simple, développe seulement quand c'est nécessaire. " +
+    "question est simple ; développe autant qu'il le faut quand c'est " +
+    "justifié — code, raisonnement technique, explication de fond. " +
     "Évite les formules de politesse creuses et les listes à puces quand " +
-    "une phrase suffit.";
+    "une phrase suffit.\n\n" +
+    "Deux capacités particulières :\n" +
+    "1. IMAGE — si on te demande de générer, dessiner ou créer une image, " +
+    "réponds par une courte phrase puis, sur une ligne seule, " +
+    "IMAGE(description détaillée en anglais). La description anglaise est " +
+    "envoyée telle quelle au générateur : sois précis et visuel.\n" +
+    "2. SITE WEB — si on te demande un site, une page ou une interface, " +
+    "donne un document HTML complet et autonome dans un bloc ```html, " +
+    "styles et scripts compris. Pas de fichiers séparés, pas de " +
+    "dépendances externes : une seule page qui s'ouvre telle quelle.";
+
+  // Génération d'images sans clé ni compte (Pollinations) : l'image est
+  // une simple URL, donc un <img> suffit — aucun appel à authentifier.
+  var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
+
+  // Graine dérivée du texte : la même description redonne la même image,
+  // sinon chaque redessin de la conversation en générerait une nouvelle.
+  function seedOf(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h) % 1000000;
+  }
+
+  function imageURL(prompt) {
+    return IMAGE_ENDPOINT + encodeURIComponent(prompt) +
+      "?width=768&height=768&nologo=true&seed=" + seedOf(prompt);
+  }
 
   var store = {
     get: function (k, fallback) {
@@ -271,13 +310,114 @@
     }
 
     history.forEach(function (m) {
-      var d = document.createElement("div");
-      d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
-      d.textContent = m.content;
-      els.messages.appendChild(d);
+      els.messages.appendChild(renderMessage(m));
     });
 
     scrollDown();
+  }
+
+  /**
+   * Une bulle de conversation. Les réponses de Mob peuvent contenir deux
+   * choses que du texte brut ne rend pas : un marqueur IMAGE(...) — même
+   * convention que le CALC(...) de la version Python — et une page HTML
+   * complète. Les deux sont extraits du texte affiché et remplacés par
+   * quelque chose d'utilisable : l'image elle-même, ou des boutons.
+   */
+  function renderMessage(m) {
+    var d = document.createElement("div");
+    d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
+
+    if (m.role !== "assistant") {
+      d.textContent = m.content;
+      return d;
+    }
+
+    var text = m.content;
+    var image = text.match(/IMAGE\(([^)]+)\)/i);
+    if (image) text = text.replace(image[0], "").trim();
+
+    var code = extractHtml(text);
+    // Un document HTML entier dans une bulle est illisible sur téléphone :
+    // on le retire du texte, il reste accessible par les boutons.
+    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
+
+    if (text) {
+      var body = document.createElement("div");
+      body.textContent = text;
+      d.appendChild(body);
+    }
+    if (image) d.appendChild(imageBlock(image[1].trim()));
+    if (code) d.appendChild(siteBlock(code));
+
+    return d;
+  }
+
+  function extractHtml(text) {
+    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
+    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
+    return null;
+  }
+
+  function imageBlock(prompt) {
+    var wrap = document.createElement("div");
+    wrap.className = "gen";
+
+    var img = document.createElement("img");
+    img.alt = prompt;
+    img.loading = "lazy";
+    img.src = imageURL(prompt);
+    img.onerror = function () {
+      wrap.className = "gen-fail";
+      wrap.textContent = "Image indisponible — le service gratuit est limité " +
+        "à environ une image toutes les 15 secondes. Réessaie dans un instant.";
+    };
+    wrap.appendChild(img);
+
+    var cap = document.createElement("div");
+    cap.className = "cap";
+    cap.textContent = prompt;
+    wrap.appendChild(cap);
+    return wrap;
+  }
+
+  function siteBlock(code) {
+    var wrap = document.createElement("div");
+    wrap.className = "gen-actions";
+
+    function button(label, fn) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", fn);
+      wrap.appendChild(b);
+      return b;
+    }
+
+    button("👁 Aperçu", function () {
+      var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
+      window.open(url, "_blank");
+      // Laisser le temps à l'onglet de charger avant de libérer l'URL.
+      setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    });
+
+    button("⬇ Enregistrer", function () {
+      var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "site.html";
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+    });
+
+    var copy = button("⧉ Copier le code", function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(code).then(function () {
+        copy.textContent = "✓ Copié";
+        setTimeout(function () { copy.textContent = "⧉ Copier le code"; }, 1600);
+      });
+    });
+
+    return wrap;
   }
 
   function scrollDown() {
@@ -509,7 +649,20 @@
 
   syncVoiceButton();
   render();
-  if (!store.get("mob.key", "")) els.settings.showModal();
+
+  // Question passée dans l'adresse : ?q=... — c'est par là qu'arrive le
+  // raccourci Siri, qui dicte puis ouvre Mob avec la question déjà posée.
+  // On la retire de l'URL aussitôt, sinon un simple rechargement de la
+  // page la reposerait indéfiniment.
+  var asked = new URLSearchParams(location.search).get("q");
+  if (asked) window.history.replaceState(null, "", location.pathname);
+
+  if (!store.get("mob.key", "")) {
+    els.settings.showModal();
+  } else if (asked && asked.trim()) {
+    unlockSpeech();
+    ask(asked.trim());
+  }
 })();
 </script>
 </body>
