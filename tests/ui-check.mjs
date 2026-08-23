@@ -95,8 +95,8 @@ await check("sans clé, l'app conduit vers les réglages", async () => {
 /* ------------------------------------------------------------------ */
 group("navigation");
 
-await check("les trois vues de base s'ouvrent", async () => {
-  for (const view of ["chat", "creations", "settings"]) {
+await check("les vues de base s'ouvrent", async () => {
+  for (const view of ["home", "chat", "creations", "settings"]) {
     await go(view);
     assert(await page.locator(`#view-${view}.active`).count() === 1, `vue ${view} inactive`);
   }
@@ -110,6 +110,136 @@ await check("l'onglet courant est signalé", async () => {
   await go("chat");
   const marked = await page.locator('nav button[aria-current="page"]').count();
   assert(marked === 1, `${marked} onglets marqués comme courants`);
+});
+
+/* ------------------------------------------------------------------ */
+group("tableau de bord");
+
+// Le tableau de bord ne calcule que sur des messages datés : on en sème
+// à des dates connues, comme le ferait un usage réel étalé sur la semaine.
+const DAY = 86400000;
+const dated = (offsetDays, role, content) =>
+  ({ role, content, ts: Date.now() - offsetDays * DAY });
+
+await check("l'accueil s'ouvre sur le tableau de bord", async () => {
+  await go("home");
+  for (const sel of ["#heroValue", "#watchlist", "#metrics", "#chartHost", "#homeTabs"]) {
+    assert(await page.locator(sel).count() === 1, `${sel} introuvable`);
+  }
+});
+
+await check("le chiffre principal compte l'activité de la période", async () => {
+  await seed({ "mob.history": [
+    dated(1, "user", "hier"),
+    dated(2, "assistant", "réponse IMAGE(a violet robot)"),
+    dated(3, "user", "avant-hier"),
+    dated(40, "user", "il y a longtemps"),
+  ] });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("home");
+  assert((await page.textContent("#heroValue")) === "3",
+    `attendu 3 sur 30 jours, obtenu ${await page.textContent("#heroValue")}`);
+});
+
+await check("changer de période change le chiffre", async () => {
+  await page.selectOption("#period", "365");
+  assert((await page.textContent("#heroValue")) === "4",
+    `attendu 4 sur un an, obtenu ${await page.textContent("#heroValue")}`);
+  await page.selectOption("#period", "30");
+});
+
+await check("la liste d'activité détaille quatre lignes chiffrées", async () => {
+  assert(await page.locator("#watchlist .list-row").count() === 4,
+    "la liste d'activité ne montre pas ses quatre lignes");
+  assert(await page.locator("#watchlist .delta").count() === 4, "les variations manquent");
+  const images = await page.textContent("#watchlist .list-row:nth-child(3) .vl b");
+  assert(images === "1", `une image attendue, obtenu ${images}`);
+});
+
+await check("les quatre tuiles de « Ton espace » sont remplies", async () => {
+  assert(await page.locator("#metrics .metric").count() === 4, "il manque des tuiles");
+  assert((await page.textContent("#metrics .metric:nth-child(1) b")) === "4", "total de messages faux");
+});
+
+await check("le graphique est réellement tracé", async () => {
+  assert(await page.locator("#chartHost svg").count() === 1, "aucune courbe dessinée");
+  assert(await page.locator("#chartHost .tip").count() === 1, "l'infobulle manque");
+  assert((await page.textContent("#chartHost .tip")).trim().length > 0, "infobulle vide");
+});
+
+await check("les pilules de période redessinent la courbe", async () => {
+  // Sur 1 jour il n'y a rien : la courbe doit céder la place à un message,
+  // pas rester figée sur le tracé du mois.
+  await page.click('#ranges button[data-range="1J"]');
+  assert(await page.getAttribute('#ranges button[data-range="1J"]', "aria-pressed") === "true",
+    "la pilule ne s'affiche pas comme sélectionnée");
+  assert(await page.locator("#chartHost .chart-empty").count() === 1,
+    "la courbe n'a pas été redessinée pour la journée");
+  await page.click('#ranges button[data-range="1M"]');
+  assert(await page.locator("#chartHost svg").count() === 1, "retour au mois sans courbe");
+});
+
+await check("les onglets changent réellement les panneaux affichés", async () => {
+  await page.click('#homeTabs button[data-tab="outils"]');
+  assert(await page.locator("#quick").isVisible(), "les actions rapides ne s'affichent pas");
+  assert(await page.locator("#watchlist").isHidden(), "la liste d'activité aurait dû être masquée");
+  await page.click('#homeTabs button[data-tab="apercu"]');
+  assert(await page.locator("#watchlist").isVisible(), "la liste d'activité n'est pas revenue");
+  assert(await page.locator("#quick").isHidden(), "les actions rapides auraient dû être masquées");
+});
+
+await check("une action rapide prépare la question dans la conversation", async () => {
+  await page.click('#homeTabs button[data-tab="outils"]');
+  await page.click("#quick button:first-child");
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation ne s'est pas ouverte");
+  const typed = await page.inputValue("#input");
+  assert(typed.startsWith("Génère une image"), `saisie préparée inattendue : « ${typed} »`);
+  await page.fill("#input", "");
+});
+
+await check("le bouton de la carte en dégradé ouvre la conversation", async () => {
+  await go("home");
+  await page.click('#homeTabs button[data-tab="apercu"]');
+  await page.click("#promoCta");
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation ne s'est pas ouverte");
+});
+
+/* ------------------------------------------------------------------ */
+group("en-tête");
+
+await check("la barre « Demande à Mob » pose bien la question", async () => {
+  // Sans clé, la question est mise de côté et les réglages s'ouvrent :
+  // c'est l'effet attendu, et il se vérifie sans appel réseau.
+  await page.evaluate(() => localStorage.removeItem("mob.key"));
+  await go("home");
+  await page.fill("#ask", "une question depuis l'en-tête");
+  await page.locator("#ask").press("Enter");
+  assert(await page.locator("#view-settings.active").count() === 1,
+    "la question de l'en-tête n'a pas été prise en compte");
+});
+
+await check("la cloche ouvre puis referme les notifications", async () => {
+  await page.click("#bell");
+  assert(await page.locator("#notifs").isVisible(), "le panneau ne s'est pas ouvert");
+  assert((await page.textContent("#notifBody")).includes("clé"), "le panneau ne dit rien de la clé");
+  await page.click("#headSub");
+  assert(await page.locator("#notifs").isHidden(), "le panneau est resté ouvert");
+});
+
+await check("le bloc profil mène aux réglages", async () => {
+  await go("home");
+  await page.click("#profileBtn");
+  assert(await page.locator("#view-settings.active").count() === 1, "les réglages ne se sont pas ouverts");
+});
+
+await check("le nom affiché apparaît dans la salutation et l'avatar", async () => {
+  await page.fill("#displayName", "Guillaume");
+  await page.locator("#displayName").dispatchEvent("change");
+  assert((await page.textContent("#profileName")) === "Guillaume", "le profil n'affiche pas le nom");
+  assert((await page.textContent("#avatar")) === "G", "l'avatar ne porte pas l'initiale");
+  await go("home");
+  assert((await page.textContent("#headTitleText")).includes("Guillaume"),
+    `salutation sans le nom : ${await page.textContent("#headTitleText")}`);
 });
 
 /* ------------------------------------------------------------------ */
@@ -354,6 +484,43 @@ await check("en thème clair, les bulles se détachent du fond", async () => {
   assert(Math.abs(lum(usr) - lum(bg)) > 6, `bulle utilisateur indistincte du fond (${usr} sur ${bg})`);
 });
 
+await check("la barre de recherche est une pilule, pas une boîte dans une boîte", async () => {
+  // La règle générale des champs de formulaire l'emportait sur celle de la
+  // barre : le champ redessinait un cadre gris à l'intérieur de la pilule.
+  const box = await page.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector("#ask"));
+    return { border: cs.borderTopWidth, bg: cs.backgroundColor };
+  });
+  assert(box.border === "0px", `le champ garde une bordure (${box.border})`);
+  assert(/rgba\(0, 0, 0, 0\)|transparent/.test(box.bg), `le champ garde un fond (${box.bg})`);
+});
+
+await check("le sélecteur de période reste une pastille", async () => {
+  await go("home");
+  const ratio = await page.evaluate(() => {
+    const sel = document.querySelector("#period").getBoundingClientRect();
+    const card = document.querySelector(".hero").getBoundingClientRect();
+    return sel.width / card.width;
+  });
+  assert(ratio < 0.7, `le sélecteur occupe ${Math.round(ratio * 100)} % de la carte`);
+});
+
+await check("l'infobulle du graphique reste dans sa carte", async () => {
+  await seed({ "mob.history": [
+    { role: "user", content: "a", ts: Date.now() - 2 * 86400000 },
+    { role: "assistant", content: "b", ts: Date.now() - 2 * 86400000 },
+    { role: "user", content: "c", ts: Date.now() - 1 * 86400000 },
+  ] });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("home");
+  const inside = await page.evaluate(() => {
+    const tip = document.querySelector("#chartHost .tip").getBoundingClientRect();
+    const card = document.querySelector(".chart-wrap").getBoundingClientRect();
+    return tip.top >= card.top - 1 && tip.bottom <= card.bottom + 1;
+  });
+  assert(inside, "l'infobulle sort de la carte du graphique");
+});
+
 await check("rien ne déborde horizontalement", async () => {
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -370,6 +537,51 @@ await check("une conversation très longue ne sature pas l'affichage", async () 
   const drawn = await page.locator(".msg").count();
   assert(drawn > 0 && drawn <= 80, `${drawn} bulles dessinées pour 400 messages`);
   assert(await page.locator(".older").count() === 1, "le repère « messages plus anciens » manque");
+});
+
+/* ------------------------------------------------------------------ */
+group("grand écran");
+
+await check("la navigation devient une barre latérale à gauche", async () => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const [navBox, mainBox] = await page.evaluate(() => {
+    const r = (s) => { const b = document.querySelector(s).getBoundingClientRect();
+                       return { x: b.x, y: b.y, w: b.width, h: b.height }; };
+    return [r("nav"), r("main")];
+  });
+  assert(navBox.x < mainBox.x, "la barre latérale n'est pas à gauche du contenu");
+  assert(navBox.h > navBox.w, "la barre latérale n'est pas en colonne");
+});
+
+await check("Réglages et Aide sont épinglés en bas de la barre", async () => {
+  const gap = await page.evaluate(() => {
+    const main = document.querySelector(".nav-main").getBoundingClientRect();
+    const foot = document.querySelector(".nav-foot").getBoundingClientRect();
+    const nav = document.querySelector("nav").getBoundingClientRect();
+    return { after: foot.y - main.bottom, toBottom: nav.bottom - foot.bottom };
+  });
+  assert(gap.after > 40, "le bloc du bas n'est pas repoussé vers le bas");
+  assert(gap.toBottom < 40, "le bloc du bas ne touche pas le bas de la barre");
+});
+
+await check("l'onglet Aide s'ouvre sur grand écran", async () => {
+  await go("help");
+  assert(await page.locator("#view-help .card").count() >= 3, "la page d'aide est vide");
+});
+
+await check("le tableau de bord passe sur deux colonnes", async () => {
+  await go("home");
+  const cols = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".dash")).gridTemplateColumns.split(" ").length);
+  assert(cols === 2, `${cols} colonne(s) au lieu de 2`);
+});
+
+await check("rien ne déborde non plus sur grand écran", async () => {
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert(overflow <= 1, `${overflow}px de débordement horizontal`);
+  await page.setViewportSize({ width: 402, height: 874 });
 });
 
 /* ------------------------------------------------------------------ */

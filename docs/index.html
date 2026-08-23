@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mob">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#08070d">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 
@@ -31,38 +31,40 @@
 <style>
   :root {
     --bg: #08070d;
-    --panel: #100e18;
-    --surface: #17141f;
-    --surface-2: #1f1a2b;
-    --line: #2b2440;
-    --text: #f2f0f7;
-    --muted: #9b93b0;
-    --accent: #c77dff;
-    --accent-2: #e0aaff;
-    --accent-ink: #1a0b28;
+    --panel: #0e0c15;
+    --surface: #14111e;
+    --surface-2: #1c1729;
+    --line: #272038;
+    --line-soft: #1e1930;
+    --text: #f4f2f9;
+    --muted: #9990ac;
+    --accent: #a855f7;
+    --accent-2: #d8b4fe;
+    --accent-ink: #16041f;
     --danger: #ff6b8a;
-    --ok: #4ade80;
-    --radius: 18px;
+    --ok: #3ddc84;
+    --radius: 20px;
     --fs: 16px;
-    --glow: rgba(199, 125, 255, .28);
-    --card-grad: linear-gradient(150deg, rgba(199,125,255,.16), rgba(199,125,255,.03) 55%);
+    --glow: rgba(168, 85, 247, .30);
+    --sheen: linear-gradient(150deg, rgba(255,255,255,.045), rgba(255,255,255,0) 60%);
   }
 
   :root[data-theme="light"] {
-    --bg: #ece8f4;
+    --bg: #eeeaf6;
     --panel: #ffffff;
     --surface: #ffffff;
-    --surface-2: #f0ebf9;
-    --line: #d9d0ea;
+    --surface-2: #f3eefb;
+    --line: #ddd4ee;
+    --line-soft: #e8e1f4;
     --text: #17122a;
-    --muted: #5c5473;
+    --muted: #5d5476;
     --accent: #7b2cbf;
     --accent-2: #9d4edd;
     --accent-ink: #ffffff;
     --danger: #c0244a;
-    --ok: #1a7f43;
+    --ok: #14804a;
     --glow: rgba(123, 44, 191, .16);
-    --card-grad: linear-gradient(150deg, rgba(123,44,191,.10), rgba(123,44,191,.02) 55%);
+    --sheen: linear-gradient(150deg, rgba(123,44,191,.05), rgba(123,44,191,0) 60%);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -82,97 +84,254 @@
   body::before {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background:
-      radial-gradient(60% 45% at 78% 8%, var(--glow), transparent 70%),
-      radial-gradient(50% 40% at 12% 92%, var(--glow), transparent 70%);
+      radial-gradient(58% 42% at 76% 4%, var(--glow), transparent 68%),
+      radial-gradient(46% 38% at 8% 96%, var(--glow), transparent 70%);
   }
 
   #app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100dvh; }
 
-  /* ---------- en-tête ---------- */
-  .topbar {
-    display: flex; align-items: center; gap: 12px;
-    padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+  /* ============ barre latérale / navigation ============ */
+  nav {
+    display: flex; gap: 4px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line); background: var(--panel);
   }
-  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .mark {
-    width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
-    background: linear-gradient(140deg, var(--accent-2), var(--accent));
-    color: var(--accent-ink); display: grid; place-items: center;
-    font-weight: 800; font-size: 16px;
-    box-shadow: 0 6px 20px var(--glow);
+  .nav-main, .nav-foot { display: contents; }
+  nav button {
+    flex: 1; padding: 8px 3px; border: none; background: none; cursor: pointer;
+    color: var(--muted); font: inherit; font-size: 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border-radius: 13px; min-width: 0;
   }
-  .brand .who { min-width: 0; }
-  .brand .who b { display: block; font-size: 15.5px; font-weight: 650; letter-spacing: .2px; }
-  .who b { display: block; }
-  .who small {
-    display: block; color: var(--muted); font-size: 11.5px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .topbar .spacer { flex: 1; }
+  nav button .ico { font-size: 18px; line-height: 1; }
+  nav button .lbl2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  nav button[aria-current="page"] { color: var(--accent); background: var(--surface); }
+  .nav-brand { display: none; }
+  nav .nav-sep { display: none; }
+  @media (max-width: 899px) { nav button[data-view="help"] { display: none; } }
 
-  .chip {
-    height: 38px; min-width: 38px; padding: 0 12px; border-radius: 12px;
-    border: 1px solid var(--line); background: var(--surface);
-    color: var(--text); font: inherit; font-size: 15px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 7px;
+  /* ============ en-tête de page ============ */
+  header.page-head {
+    display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+    padding: max(14px, env(safe-area-inset-top)) 16px 10px;
   }
-  .chip[aria-pressed="true"] {
+  .head-text { min-width: 0; flex: 1; }
+  .head-text h1 {
+    margin: 0; font-size: 22px; line-height: 1.2; font-weight: 680; letter-spacing: -.02em;
+  }
+  .head-text p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+  .head-tools { display: flex; align-items: center; gap: 8px; }
+
+  /* La pilule « Demande à Mob », reprise de la barre de recherche de la référence. */
+  .askbar {
+    display: flex; align-items: center; gap: 8px;
+    height: 42px; padding: 0 6px 0 15px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); min-width: 0;
+  }
+  .askbar input[type="text"] {
+    flex: 1; width: auto; min-width: 0; padding: 0; border-radius: 0;
+    border: none; background: none; outline: none;
+    color: var(--text); font: inherit; font-size: 14px;
+  }
+  .askbar input::placeholder { color: var(--muted); }
+  .askbar .go {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    border: none; color: var(--accent-ink); font-size: 14px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+  }
+
+  .icon-btn {
+    width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); font-size: 16px; position: relative;
+    display: grid; place-items: center;
+  }
+  .icon-btn[aria-pressed="true"] {
     background: linear-gradient(140deg, var(--accent-2), var(--accent));
     color: var(--accent-ink); border-color: transparent;
   }
-  .chip.badge-admin {
-    font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-    background: linear-gradient(140deg, var(--accent-2), var(--accent));
-    color: var(--accent-ink); border-color: transparent; height: 26px; padding: 0 10px;
+  .icon-btn .dot-new {
+    position: absolute; top: 8px; right: 9px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent-2); border: 2px solid var(--panel);
   }
 
-  /* ---------- corps ---------- */
-  main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* Le bloc profil du coin haut droit de la référence. */
+  .profile {
+    display: flex; align-items: center; gap: 10px; padding: 5px 12px 5px 5px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+    cursor: pointer; font: inherit; color: var(--text); text-align: left; max-width: 230px;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); display: grid; place-items: center;
+    font-weight: 750; font-size: 14px;
+  }
+  .profile .who { min-width: 0; }
+  .profile .who b { display: block; font-size: 13px; font-weight: 620; line-height: 1.25;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile .who small { display: block; color: var(--muted); font-size: 11px; line-height: 1.25;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 699px) { .profile .who { display: none; } .profile { padding: 4px; } }
 
+  /* Panneau des notifications, ouvert par la cloche. */
+  .popover {
+    position: absolute; right: 16px; top: 66px; z-index: 30; width: min(320px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+  .popover h3 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+  .popover .note-line { display: flex; gap: 10px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--line-soft); }
+  .popover .note-line:first-of-type { border-top: none; }
+  .popover .note-line span:first-child { flex-shrink: 0; }
+  .popover .note-line small { display: block; color: var(--muted); font-size: 11.5px; }
+
+  /* ============ onglets segmentés ============ */
+  .tabs {
+    display: flex; gap: 4px; margin: 2px 16px 12px; padding: 4px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 1; white-space: nowrap; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    border: none; background: none; color: var(--muted); font: inherit; font-size: 13.5px;
+  }
+  .tabs button[aria-selected="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); font-weight: 620;
+  }
+
+  /* ============ corps ============ */
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
   .view.active { display: flex; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 16px 16px; }
 
-  .scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px 8px; }
-
-  .card {
-    background: var(--surface); background-image: var(--card-grad);
+  /* ============ cartes ============ */
+  .card, .panel {
+    background: var(--surface); background-image: var(--sheen);
     border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 16px; margin-bottom: 14px;
+    padding: 18px; margin-bottom: 14px;
   }
-  .card > h2 { margin: 0 0 3px; font-size: 16px; font-weight: 650; }
-  .card > p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .card > h2, .panel > h2 { margin: 0 0 3px; font-size: 15.5px; font-weight: 650; }
+  .card > p.sub, .panel > p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 650; flex: 1; min-width: 0; }
 
-  /* ---------- conversation ---------- */
+  /* ---- tableau de bord ---- */
+  .dash { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+  .dash-col { min-width: 0; }
+
+  /* Grande carte chiffrée, équivalent du « Total Holding ». */
+  .hero {
+    background: var(--surface); background-image: var(--sheen);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 14px;
+  }
+  .hero .top { display: flex; align-items: center; gap: 10px; }
+  .hero .top .k { flex: 1; color: var(--muted); font-size: 13px; }
+  .hero .big { font-size: 38px; font-weight: 700; letter-spacing: -.03em; margin: 8px 0 2px; line-height: 1.05; }
+  .hero .sub2 { color: var(--muted); font-size: 13px; }
+  .delta { font-size: 12.5px; font-weight: 620; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .delta.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
+  .delta.down { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+  .delta.flat { color: var(--muted); background: var(--surface-2); }
+  select.mini {
+    width: auto; max-width: 60%; height: 32px; padding: 0 10px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    font: inherit; font-size: 12.5px;
+  }
+
+  /* Carte promotionnelle en dégradé, équivalent du « Decisions Powered by Data ». */
+  .promo {
+    border-radius: var(--radius); padding: 22px; margin-bottom: 14px; position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 55%, #2e1065 100%);
+    color: #fff;
+  }
+  .promo::after {
+    content: ""; position: absolute; right: -60px; top: -70px; width: 220px; height: 220px;
+    border-radius: 50%; background: rgba(255,255,255,.13);
+  }
+  .promo h3 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.02em; max-width: 20ch; position: relative; }
+  .promo p { margin: 8px 0 16px; font-size: 13.5px; opacity: .88; max-width: 34ch; position: relative; }
+  .promo button {
+    position: relative; padding: 11px 20px; border-radius: 999px; cursor: pointer;
+    border: none; background: #fff; color: #2e1065; font: inherit; font-size: 13.5px; font-weight: 650;
+  }
+
+  /* Graphique + pilules de période, équivalent du panneau de cours. */
+  .chart-wrap { position: relative; }
+  #chartHost { position: relative; }
+  .ranges { display: flex; gap: 4px; }
+  .ranges button {
+    padding: 6px 11px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+    background: var(--surface-2); color: var(--muted); font: inherit; font-size: 12px;
+  }
+  .ranges button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 620; }
+  .chart-wrap svg { width: 100%; height: 168px; display: block; overflow: visible; }
+  .chart-x { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 6px; }
+  .tip {
+    position: absolute; pointer-events: none; transform: translate(-50%, -120%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    padding: 7px 11px; font-size: 12px; white-space: nowrap; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  .tip b { display: block; font-size: 14px; }
+  .tip small { color: var(--muted); }
+  .chart-empty { color: var(--muted); font-size: 13px; padding: 26px 0; text-align: center; }
+
+  /* Liste à variations, équivalent de la « Watchlist ». */
+  .list-row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .list-row:first-of-type { border-top: none; }
+  .list-row .ic {
+    width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center;
+    background: var(--surface-2); font-size: 17px;
+  }
+  .list-row .nm { flex: 1; min-width: 0; }
+  .list-row .nm b { display: block; font-size: 14px; font-weight: 600; }
+  .list-row .nm small { display: block; color: var(--muted); font-size: 11.5px; }
+  .list-row .vl { text-align: right; }
+  .list-row .vl b { display: block; font-size: 14.5px; font-weight: 650; }
+
+  /* Tuiles 2×2, équivalent du « My Portfolio ». */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric { padding: 14px; border-radius: 15px; background: var(--surface-2); border: 1px solid var(--line); }
+  .metric .ic { font-size: 17px; }
+  .metric b { display: block; font-size: 19px; font-weight: 700; margin-top: 6px; letter-spacing: -.02em; }
+  .metric small { color: var(--muted); font-size: 11.5px; }
+
+  /* Actions rapides de l'onglet « Outils ». */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .quick button {
+    text-align: left; padding: 15px; border-radius: 15px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit;
+  }
+  .quick button .ic { font-size: 20px; }
+  .quick button b { display: block; font-size: 14px; font-weight: 620; margin-top: 7px; }
+  .quick button small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
+  /* ============ conversation ============ */
   #messages { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
-
   .msg { max-width: 88%; padding: 12px 15px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
   .msg.user {
     align-self: flex-end; border-bottom-right-radius: 6px;
     background: linear-gradient(140deg, var(--accent-2), var(--accent));
     color: var(--accent-ink);
   }
-  .msg.bot {
-    align-self: flex-start; border-bottom-left-radius: 6px;
-    background: var(--surface); border: 1px solid var(--line);
-  }
+  .msg.bot { align-self: flex-start; border-bottom-left-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
   .msg.error {
     align-self: stretch; background: transparent;
     border: 1px solid var(--danger); color: var(--danger); font-size: 14px;
   }
-
-  .older {
-    align-self: center; font-size: 12px; color: var(--muted);
-    padding: 5px 13px; border-radius: 999px; background: var(--surface-2);
-  }
+  .older { align-self: center; font-size: 12px; color: var(--muted); padding: 5px 13px; border-radius: 999px; background: var(--surface-2); }
 
   .gen { margin-top: 11px; }
-  .gen img {
-    width: 100%; aspect-ratio: 1; object-fit: cover;
-    border-radius: 13px; display: block; background: var(--surface-2);
-  }
+  .gen img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; display: block; background: var(--surface-2); }
   .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
   .gen-fail { margin-top: 11px; font-size: 13px; color: var(--danger); }
-
   .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .gen-actions button {
     padding: 9px 13px; border-radius: 11px; font: inherit; font-size: 13.5px;
@@ -181,13 +340,12 @@
 
   .empty { margin: auto; text-align: center; color: var(--muted); padding: 30px 20px; }
   .empty .big {
-    width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 20px;
+    width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 21px;
     background: linear-gradient(140deg, var(--accent-2), var(--accent));
     color: var(--accent-ink); display: grid; place-items: center;
     font-size: 27px; font-weight: 800; box-shadow: 0 10px 34px var(--glow);
   }
   .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 18px; }
-
   .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
   .suggest button {
     padding: 9px 14px; border-radius: 999px; font: inherit; font-size: 13.5px;
@@ -200,20 +358,15 @@
   .thinking span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%,60%,100% { opacity: .25 } 30% { opacity: 1 } }
 
-  /* ---------- zone de saisie ---------- */
   #composer { display: flex; align-items: flex-end; gap: 9px; padding: 10px 16px 12px; }
   #input {
-    flex: 1; resize: none; max-height: 140px;
-    padding: 12px 16px; border-radius: 22px;
-    border: 1px solid var(--line); background: var(--surface);
-    color: var(--text); font: inherit; line-height: 1.4;
+    flex: 1; resize: none; max-height: 140px; padding: 12px 16px; border-radius: 22px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; line-height: 1.4;
   }
   #input:focus { outline: none; border-color: var(--accent); }
-
   .round {
     width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-    border: 1px solid var(--line); background: var(--surface);
-    color: var(--text); font-size: 18px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 18px; cursor: pointer;
   }
   .round.primary {
     border: none; color: var(--accent-ink);
@@ -224,26 +377,12 @@
   .round.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
   @keyframes pulse { 50% { transform: scale(1.09) } }
 
-  /* ---------- navigation ---------- */
-  nav {
-    display: flex; gap: 4px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line); background: var(--panel);
-  }
-  nav button {
-    flex: 1; padding: 8px 4px; border: none; background: none; cursor: pointer;
-    color: var(--muted); font: inherit; font-size: 10.5px;
-    display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 12px;
-  }
-  nav button .ico { font-size: 19px; line-height: 1; }
-  nav button[aria-current="page"] { color: var(--accent); background: var(--surface); }
-
-  /* ---------- réglages ---------- */
+  /* ============ formulaires ============ */
   .field { margin-top: 15px; }
   .field > label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; }
   input[type=password], input[type=text], select, textarea.box {
     width: 100%; padding: 12px 14px; border-radius: 12px;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--text); font: inherit;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit;
   }
   textarea.box { min-height: 108px; resize: vertical; line-height: 1.5; font-size: 14px; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
@@ -251,12 +390,25 @@
   .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; }
   .row .lbl { font-size: 14.5px; }
   .row .lbl small { display: block; color: var(--muted); font-size: 12px; }
+  .chip {
+    height: 38px; min-width: 38px; padding: 0 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent;
+  }
+  .badge-admin {
+    display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-radius: 999px; padding: 3px 9px; vertical-align: middle; margin-left: 8px;
+  }
 
   .seg { display: flex; gap: 6px; }
   .seg button {
     flex: 1; padding: 10px 5px; border-radius: 11px; cursor: pointer;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--muted); font: inherit; font-size: 13.5px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font: inherit; font-size: 13.5px;
   }
   .seg button[aria-pressed="true"] {
     background: linear-gradient(140deg, var(--accent-2), var(--accent));
@@ -272,10 +424,7 @@
   .state .who2 { flex: 1; min-width: 0; }
   .state .who2 small { display: block; color: var(--muted); font-size: 12px; }
 
-  .link-btn {
-    background: none; border: none; padding: 0; cursor: pointer;
-    color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline;
-  }
+  .link-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline; }
   .btn {
     width: 100%; padding: 12px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 14.5px;
     border: none; color: var(--accent-ink); font-weight: 650;
@@ -284,82 +433,189 @@
   .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
   .btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); font-weight: 400; }
   .btn + .btn { margin-top: 9px; }
-
   .range { width: 100%; accent-color: var(--accent); }
   .range-val { color: var(--muted); }
-
   .note { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
   .note a { color: var(--accent); }
   .warn {
     margin-top: 13px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.55;
     border: 1px solid var(--danger); color: var(--danger); background: transparent;
   }
-
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat { padding: 13px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); }
   .stat b { display: block; font-size: 19px; font-weight: 700; }
   .stat small { color: var(--muted); font-size: 11.5px; }
 
-  /* ---------- créations ---------- */
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-  .tile { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+  .tile { border-radius: 15px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
   .tile img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
-  .tile .lab { padding: 8px 10px; font-size: 11.5px; color: var(--muted);
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .lab { padding: 8px 10px; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* ---------- large écran : barre latérale, comme la référence ---------- */
+  .steps { margin: 0; padding-left: 20px; font-size: 14px; }
+  .steps li { margin-bottom: 9px; }
+
+  /* ============ grand écran : la barre latérale de la référence ============ */
   @media (min-width: 900px) {
-    #app { flex-direction: row; padding: 18px; gap: 18px; }
+    #app { flex-direction: row; padding: 16px; gap: 16px; }
     nav {
-      order: -1;
-      flex-direction: column; width: 224px; flex-shrink: 0; gap: 6px;
-      border: 1px solid var(--line); border-radius: 22px; padding: 16px 12px;
+      order: -1; flex-direction: column; width: 236px; flex-shrink: 0; gap: 4px;
+      border: 1px solid var(--line); border-radius: 24px; padding: 18px 12px;
       background: var(--panel);
     }
-    nav button { flex: none; flex-direction: row; justify-content: flex-start; gap: 11px; padding: 12px 14px; font-size: 14.5px; }
+    .nav-main { display: flex; flex-direction: column; gap: 4px; }
+    .nav-foot { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+    nav .nav-sep { display: block; height: 1px; background: var(--line); margin: 14px 6px 12px; }
+    nav button {
+      flex: none; flex-direction: row; justify-content: flex-start; gap: 12px;
+      padding: 11px 14px; font-size: 14px;
+    }
     nav button .ico { font-size: 17px; }
-    nav .nav-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 20px; }
+    .nav-brand .mark {
+      width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+      background: linear-gradient(140deg, var(--accent-2), var(--accent));
+      color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: 16px;
+      box-shadow: 0 6px 20px var(--glow);
+    }
+    .nav-brand b { display: block; font-size: 16px; font-weight: 680; letter-spacing: -.01em; }
+    .nav-brand small { display: block; color: var(--muted); font-size: 11px; }
     main {
-      flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 22px;
+      flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px;
       background: var(--panel); overflow: hidden; flex-direction: column;
     }
-    .topbar { padding: 18px 22px 12px; }
-    .scroll { padding: 4px 22px 8px; }
-    #composer { padding: 12px 22px 18px; }
+    header.page-head { padding: 20px 24px 12px; flex-wrap: nowrap; align-items: center; }
+    .head-text h1 { font-size: 26px; }
+    .askbar { width: 250px; }
+    .tabs { margin: 2px 24px 14px; flex: none; align-self: flex-start; }
+    .tabs button { flex: none; }
+    .scroll { padding: 2px 24px 20px; }
+    #composer { padding: 12px 24px 18px; }
     .grid { grid-template-columns: repeat(3, 1fr); }
-    .brand { display: none; }
+    .popover { right: 24px; top: 74px; }
   }
-  @media (max-width: 899px) { nav .nav-brand { display: none; } }
+  @media (min-width: 1180px) {
+    .dash { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
 
 <div id="app">
   <main>
-    <div class="topbar">
-      <div class="brand">
-        <div class="mark">M</div>
-        <div class="who">
-          <b id="hello">Mob</b>
-          <small id="helloSub">Ton assistant personnel</small>
-        </div>
+
+    <!-- ====== en-tête : salutation, recherche, icônes, profil ====== -->
+    <header class="page-head">
+      <div class="head-text">
+        <h1 id="headTitle"><span id="headTitleText">Bonjour</span><span class="badge-admin" id="adminBadge" hidden>Admin</span></h1>
+        <p id="headSub">Voici ce que Mob a fait pour toi.</p>
       </div>
-      <span class="chip badge-admin" id="adminBadge" hidden>Admin</span>
-      <div class="spacer"></div>
-      <button class="chip" id="voiceToggle" aria-pressed="false" title="Lecture à voix haute">🔊</button>
+      <div class="head-tools">
+        <div class="askbar">
+          <input id="ask" type="text" placeholder="Demande à Mob…" autocomplete="off" spellcheck="false"
+                 aria-label="Demander quelque chose à Mob">
+          <button class="go" id="askMic" type="button" title="Dicter" aria-label="Dicter">🎙</button>
+        </div>
+        <button class="icon-btn" id="bell" type="button" aria-pressed="false" aria-label="Notifications">🔔<span class="dot-new" id="bellDot" hidden></span></button>
+        <button class="icon-btn" id="voiceToggle" type="button" aria-pressed="false" aria-label="Lecture à voix haute">🔈</button>
+        <button class="profile" id="profileBtn" type="button" aria-label="Ouvrir les réglages">
+          <span class="avatar" id="avatar">?</span>
+          <span class="who"><b id="profileName">Invité</b><small id="profileRole">Non connecté</small></span>
+        </button>
+      </div>
+    </header>
+
+    <div class="popover" id="notifs" hidden>
+      <h3>Notifications</h3>
+      <div id="notifBody"></div>
     </div>
 
-    <!-- Conversation -->
-    <section class="view active" id="view-chat">
-      <div class="scroll"><div id="messages"></div></div>
-      <div id="composer">
-        <button class="round" id="mic" title="Dicter">🎙</button>
-        <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
-        <button class="round primary" id="send" title="Envoyer">↑</button>
+    <!-- ====== Tableau de bord ====== -->
+    <section class="view" id="view-home">
+      <div class="tabs" id="homeTabs" role="tablist">
+        <button type="button" role="tab" data-tab="apercu" aria-selected="true">Aperçu</button>
+        <button type="button" role="tab" data-tab="activite" aria-selected="false">Activité</button>
+        <button type="button" role="tab" data-tab="outils" aria-selected="false">Outils</button>
+      </div>
+      <div class="scroll">
+        <div class="dash">
+          <div class="dash-col">
+
+            <div class="hero" id="tab-apercu-hero">
+              <div class="top">
+                <span class="k">Total des échanges</span>
+                <select class="mini" id="period" aria-label="Période">
+                  <option value="7">7 derniers jours</option>
+                  <option value="30" selected>30 derniers jours</option>
+                  <option value="90">90 derniers jours</option>
+                  <option value="365">12 derniers mois</option>
+                </select>
+              </div>
+              <div class="big" id="heroValue">0</div>
+              <div class="sub2">
+                <span class="delta flat" id="heroDelta">—</span>
+                <span id="heroNote">sur 0 message conservé</span>
+              </div>
+            </div>
+
+            <div class="promo" data-section="apercu">
+              <h3>Tes idées, guidées par tes données.</h3>
+              <p>Pose une question, demande une image, fais écrire une page — tout reste sur cet appareil.</p>
+              <button type="button" id="promoCta">Commencer maintenant</button>
+            </div>
+
+            <div class="panel chart-wrap" data-section="apercu activite">
+              <div class="panel-head">
+                <h2>Activité</h2>
+                <div class="ranges" id="ranges" role="group" aria-label="Période du graphique">
+                  <button type="button" data-range="1J" aria-pressed="false">1J</button>
+                  <button type="button" data-range="1S" aria-pressed="false">1S</button>
+                  <button type="button" data-range="1M" aria-pressed="true">1M</button>
+                  <button type="button" data-range="6M" aria-pressed="false">6M</button>
+                  <button type="button" data-range="1A" aria-pressed="false">1A</button>
+                </div>
+              </div>
+              <div id="chartHost"></div>
+            </div>
+
+            <div class="panel" data-section="outils">
+              <h2>Actions rapides</h2>
+              <p class="sub">Chaque bouton lance directement une demande à Mob.</p>
+              <div class="quick" id="quick"></div>
+            </div>
+
+          </div>
+          <div class="dash-col">
+
+            <div class="panel" data-section="apercu activite">
+              <div class="panel-head">
+                <h2>Ton activité</h2>
+                <span class="delta flat" id="watchPeriod">30 j</span>
+              </div>
+              <div id="watchlist"></div>
+            </div>
+
+            <div class="panel" data-section="apercu outils">
+              <h2>Ton espace</h2>
+              <p class="sub">L'état de Mob sur cet appareil.</p>
+              <div class="metrics" id="metrics"></div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Créations -->
+    <!-- ====== Conversation ====== -->
+    <section class="view" id="view-chat">
+      <div class="scroll"><div id="messages"></div></div>
+      <div id="composer">
+        <button class="round" id="mic" type="button" title="Dicter">🎙</button>
+        <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
+        <button class="round primary" id="send" type="button" title="Envoyer">↑</button>
+      </div>
+    </section>
+
+    <!-- ====== Créations ====== -->
     <section class="view" id="view-creations">
       <div class="scroll">
         <div class="card">
@@ -370,7 +626,7 @@
       </div>
     </section>
 
-    <!-- Réglages -->
+    <!-- ====== Réglages ====== -->
     <section class="view" id="view-settings">
       <div class="scroll">
         <div class="card">
@@ -380,6 +636,10 @@
             <span class="dot"></span>
             <span class="who2" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
             <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+          </div>
+          <div class="field">
+            <label for="displayName">Nom affiché</label>
+            <input type="text" id="displayName" placeholder="Ton prénom" autocomplete="off">
           </div>
           <div id="keyFields">
             <div class="field">
@@ -458,7 +718,43 @@
       </div>
     </section>
 
-    <!-- Admin -->
+    <!-- ====== Aide ====== -->
+    <section class="view" id="view-help">
+      <div class="scroll">
+        <div class="card">
+          <h2>Premiers pas</h2>
+          <p class="sub">Trois minutes, une seule fois.</p>
+          <ol class="steps">
+            <li>Crée une clé sur <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a> — pense à choisir le plan gratuit « Experiment » dans Billing, sinon la clé est refusée.</li>
+            <li>Colle-la dans <b>Réglages → Compte</b>. Elle n'est demandée qu'une fois.</li>
+            <li>Sur iPhone : <b>Partager → Sur l'écran d'accueil</b> pour lancer Mob en plein écran.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h2>Déclenchement vocal</h2>
+          <p class="sub">« Dis Siri, Mob »</p>
+          <p class="note" style="margin-top:0">
+            Un raccourci iOS de trois actions dicte ta question et ouvre Mob
+            avec elle déjà posée. C'est le seul chemin vocal gratuit : le
+            déclenchement natif d'une app demande l'autorisation Siri,
+            réservée au compte développeur payant. Le mode d'emploi est dans
+            <a href="https://github.com/guiidlf-sys/Mob/blob/main/shortcut/README.md" target="_blank" rel="noopener">shortcut/README.md</a>.
+          </p>
+        </div>
+        <div class="card">
+          <h2>Où vont tes données</h2>
+          <p class="note" style="margin-top:0">
+            La clé, la conversation et les réglages vivent dans le stockage
+            local de ce navigateur, sur cet appareil uniquement. Seules tes
+            questions partent chez Mistral. Attention : sur iOS, l'app ajoutée
+            à l'écran d'accueil a un stockage <b>distinct</b> de Safari — il
+            faut saisir la clé une fois dans chacun.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Admin ====== -->
     <section class="view" id="view-admin">
       <div class="scroll">
         <div class="card">
@@ -468,7 +764,7 @@
             <div class="stat"><b id="statMsgs">0</b><small>messages gardés</small></div>
             <div class="stat"><b id="statImgs">0</b><small>images générées</small></div>
             <div class="stat"><b id="statSites">0</b><small>pages générées</small></div>
-            <div class="stat"><b id="statSize">0 Ko</b><small>stockage utilisé</small></div>
+            <div class="stat"><b id="statSize">0 o</b><small>stockage utilisé</small></div>
           </div>
         </div>
 
@@ -513,12 +809,19 @@
   <nav id="nav">
     <div class="nav-brand">
       <div class="mark">M</div>
-      <div class="who"><b>Mob</b><small id="navSub">Assistant</small></div>
+      <div><b>Mob</b><small id="navSub">Assistant</small></div>
     </div>
-    <button type="button" data-view="chat" aria-current="page"><span class="ico">💬</span>Chat</button>
-    <button type="button" data-view="creations"><span class="ico">🎨</span>Créations</button>
-    <button type="button" data-view="settings"><span class="ico">⚙️</span>Réglages</button>
-    <button type="button" data-view="admin" id="navAdmin" hidden><span class="ico">🛡️</span>Admin</button>
+    <div class="nav-main">
+      <button type="button" data-view="home" aria-current="page"><span class="ico">🏠</span><span class="lbl2">Accueil</span></button>
+      <button type="button" data-view="chat"><span class="ico">💬</span><span class="lbl2">Chat</span></button>
+      <button type="button" data-view="creations"><span class="ico">🎨</span><span class="lbl2">Créations</span></button>
+      <button type="button" data-view="admin" id="navAdmin" hidden><span class="ico">🛡️</span><span class="lbl2">Admin</span></button>
+    </div>
+    <div class="nav-sep"></div>
+    <div class="nav-foot">
+      <button type="button" data-view="settings"><span class="ico">⚙️</span><span class="lbl2">Réglages</span></button>
+      <button type="button" data-view="help"><span class="ico">❔</span><span class="lbl2">Aide</span></button>
+    </div>
   </nav>
 </div>
 
@@ -560,18 +863,29 @@
   function systemPrompt() { return store.get("mob.prompt", DEFAULT_PROMPT); }
   function isAdmin() { return store.get("mob.admin", false); }
   function adminCode() { return store.get("mob.adminCode", "mob"); }
+  function displayName() { return (store.get("mob.name", "") || "").trim(); }
 
   var history = store.get("mob.history", []);
   var busy = false;
   var pendingQuestion = null;
+  var currentView = "home";
 
   var el = function (id) { return document.getElementById(id); };
   var els = {
     messages: el("messages"), input: el("input"), send: el("send"), mic: el("mic"),
     voiceToggle: el("voiceToggle"), nav: el("nav"),
-    hello: el("hello"), helloSub: el("helloSub"), navSub: el("navSub"),
-    adminBadge: el("adminBadge"), navAdmin: el("navAdmin"),
+    headTitleText: el("headTitleText"), headSub: el("headSub"),
+    adminBadge: el("adminBadge"), navAdmin: el("navAdmin"), navSub: el("navSub"),
+    ask: el("ask"), askMic: el("askMic"),
+    bell: el("bell"), bellDot: el("bellDot"), notifs: el("notifs"), notifBody: el("notifBody"),
+    profileBtn: el("profileBtn"), avatar: el("avatar"),
+    profileName: el("profileName"), profileRole: el("profileRole"),
+    homeTabs: el("homeTabs"), period: el("period"), ranges: el("ranges"),
+    heroValue: el("heroValue"), heroDelta: el("heroDelta"), heroNote: el("heroNote"),
+    chartHost: el("chartHost"), watchlist: el("watchlist"), watchPeriod: el("watchPeriod"),
+    metrics: el("metrics"), quick: el("quick"), promoCta: el("promoCta"),
     accountState: el("accountState"), accountWho: el("accountWho"),
+    displayNameInput: el("displayName"),
     keyFields: el("keyFields"), key: el("key"), editKey: el("editKey"), signOut: el("signOut"),
     themeSeg: el("themeSeg"), sizeSeg: el("sizeSeg"),
     speakPref: el("speakPref"), rate: el("rate"), rateVal: el("rateVal"),
@@ -584,25 +898,44 @@
     statMsgs: el("statMsgs"), statImgs: el("statImgs"), statSites: el("statSites"), statSize: el("statSize")
   };
 
-  /* ---------- navigation ---------- */
+  /* ================= navigation ================= */
+
+  var TITLES = {
+    home:      ["Bonjour", "Voici ce que Mob a fait pour toi."],
+    chat:      ["Conversation", "Pose une question, demande une image ou une page."],
+    creations: ["Créations", "Tout ce que Mob a produit pour toi."],
+    settings:  ["Réglages", "Compte, apparence, voix et données."],
+    help:      ["Aide", "Démarrer, déclencher à la voix, savoir où vont les données."],
+    admin:     ["Console d'administration", "Modèle, mémoire, personnalité et données."]
+  };
 
   function show(view) {
     // L'espace admin n'apparaît pas tant que le mode n'est pas actif : on
-    // rabat sur la conversation plutôt que d'afficher une vue vide.
-    if (view === "admin" && !isAdmin()) view = "chat";
+    // rabat sur l'accueil plutôt que d'afficher une vue vide.
+    if (view === "admin" && !isAdmin()) view = "home";
+    if (!TITLES[view]) view = "home";
+    currentView = view;
+
     var views = document.querySelectorAll(".view");
     for (var i = 0; i < views.length; i++) {
       views[i].classList.toggle("active", views[i].id === "view-" + view);
     }
     var buttons = els.nav.querySelectorAll("button[data-view]");
     for (var j = 0; j < buttons.length; j++) {
-      var on = buttons[j].dataset.view === view;
-      if (on) buttons[j].setAttribute("aria-current", "page");
+      if (buttons[j].dataset.view === view) buttons[j].setAttribute("aria-current", "page");
       else buttons[j].removeAttribute("aria-current");
     }
+
+    var t = TITLES[view];
+    els.headTitleText.textContent =
+      view === "home" && displayName() ? t[0] + ", " + displayName() : t[0];
+    els.headSub.textContent = t[1];
+
+    if (view === "home") renderHome();
     if (view === "creations") renderCreations();
     if (view === "admin") renderAdmin();
     if (view === "settings") syncAccount();
+    closeNotifs();
     store.set("mob.view", view);
   }
 
@@ -611,10 +944,437 @@
     if (b) show(b.dataset.view);
   });
 
-  /* ---------- conversation ---------- */
+  els.profileBtn.addEventListener("click", function () { show("settings"); });
+
+  /* ================= tableau de bord ================= */
+
+  var TABS = ["apercu", "activite", "outils"];
+
+  function currentTab() {
+    var t = store.get("mob.tab", "apercu");
+    return TABS.indexOf(t) === -1 ? "apercu" : t;
+  }
+
+  function applyTab(tab) {
+    var buttons = els.homeTabs.querySelectorAll("button[data-tab]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-selected", buttons[i].dataset.tab === tab ? "true" : "false");
+    }
+    var panels = document.querySelectorAll("#view-home [data-section]");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].hidden = panels[j].dataset.section.split(" ").indexOf(tab) === -1;
+    }
+  }
+
+  els.homeTabs.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]");
+    if (!b) return;
+    store.set("mob.tab", b.dataset.tab);
+    applyTab(b.dataset.tab);
+    renderChart();
+  });
+
+  function periodDays() { return parseInt(store.get("mob.period", 30), 10) || 30; }
+
+  els.period.addEventListener("change", function () {
+    store.set("mob.period", parseInt(els.period.value, 10));
+    renderHome();
+  });
+
+  // Les messages d'avant l'ajout de l'horodatage n'en ont pas : ils sont
+  // comptés dans le total mais jamais dans une fenêtre de temps, plutôt que
+  // d'être datés d'aujourd'hui par défaut, ce qui gonflerait les chiffres.
+  function within(m, from, to) {
+    return typeof m.ts === "number" && m.ts >= from && m.ts < to;
+  }
+
+  function countIn(from, to, test) {
+    var n = 0;
+    for (var i = 0; i < history.length; i++) {
+      if (within(history[i], from, to) && test(history[i])) n++;
+    }
+    return n;
+  }
+
+  var isUser = function (m) { return m.role === "user"; };
+  var isBot = function (m) { return m.role === "assistant"; };
+  var isImage = function (m) { return m.role === "assistant" && /IMAGE\([^)]+\)/i.test(m.content); };
+  var isSite = function (m) { return m.role === "assistant" && !!extractHtml(m.content); };
+  var any = function () { return true; };
+
+  function deltaBadge(cur, prev) {
+    var span = document.createElement("span");
+    span.className = "delta ";
+    if (!prev && !cur) { span.className += "flat"; span.textContent = "—"; }
+    else if (!prev) { span.className += "up"; span.textContent = "nouveau"; }
+    else {
+      var pct = Math.round(((cur - prev) / prev) * 100);
+      span.className += pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+      span.textContent = (pct > 0 ? "+" : "") + pct + " %";
+    }
+    return span;
+  }
+
+  function renderHome() {
+    els.period.value = String(periodDays());
+    applyTab(currentTab());
+
+    var days = periodDays();
+    var span = days * 86400000;
+    var now = Date.now();
+    var curFrom = now - span, prevFrom = now - 2 * span;
+
+    var cur = countIn(curFrom, now + 1, any);
+    var prev = countIn(prevFrom, curFrom, any);
+
+    els.heroValue.textContent = String(cur);
+    els.heroDelta.replaceWith(deltaBadgeInto(els.heroDelta, cur, prev));
+    els.heroNote.textContent = "sur " + history.length +
+      (history.length > 1 ? " messages conservés" : " message conservé");
+    els.watchPeriod.textContent = days >= 365 ? "12 mois" : days + " j";
+
+    renderWatchlist(curFrom, prevFrom, now);
+    renderMetrics();
+    renderQuick();
+    renderChart();
+    syncNotifs();
+  }
+
+  // Remplace le badge en gardant son identifiant, pour que les contrôles
+  // automatiques continuent de le retrouver.
+  function deltaBadgeInto(node, cur, prev) {
+    var fresh = deltaBadge(cur, prev);
+    fresh.id = node.id;
+    els.heroDelta = fresh;
+    return fresh;
+  }
+
+  var WATCH = [
+    { ic: "🙋", name: "Questions posées", sub: "tes messages", test: isUser },
+    { ic: "🤖", name: "Réponses de Mob", sub: "messages du modèle", test: isBot },
+    { ic: "🖼", name: "Images générées", sub: "via Pollinations", test: isImage },
+    { ic: "🧾", name: "Pages générées", sub: "documents HTML", test: isSite }
+  ];
+
+  function renderWatchlist(curFrom, prevFrom, now) {
+    els.watchlist.innerHTML = "";
+    WATCH.forEach(function (w) {
+      var cur = countIn(curFrom, now + 1, w.test);
+      var prev = countIn(prevFrom, curFrom, w.test);
+
+      var row = document.createElement("div");
+      row.className = "list-row";
+
+      var ic = document.createElement("div");
+      ic.className = "ic"; ic.textContent = w.ic;
+      row.appendChild(ic);
+
+      var nm = document.createElement("div");
+      nm.className = "nm";
+      var b = document.createElement("b"); b.textContent = w.name;
+      var s = document.createElement("small"); s.textContent = w.sub;
+      nm.appendChild(b); nm.appendChild(s);
+      row.appendChild(nm);
+
+      var vl = document.createElement("div");
+      vl.className = "vl";
+      var v = document.createElement("b"); v.textContent = String(cur);
+      vl.appendChild(v);
+      vl.appendChild(deltaBadge(cur, prev));
+      row.appendChild(vl);
+
+      els.watchlist.appendChild(row);
+    });
+  }
+
+  function storageBytes() {
+    var bytes = 0;
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf("mob.") === 0; })
+        .forEach(function (k) { bytes += (localStorage.getItem(k) || "").length; });
+    } catch (e) { /* stockage illisible */ }
+    return bytes;
+  }
+
+  function humanBytes(b) { return b > 1024 ? (b / 1024).toFixed(1) + " Ko" : b + " o"; }
+
+  function totals() {
+    var t = { msgs: history.length, images: 0, sites: 0 };
+    history.forEach(function (m) {
+      if (isImage(m)) t.images++;
+      if (isSite(m)) t.sites++;
+    });
+    return t;
+  }
+
+  function renderMetrics() {
+    var t = totals();
+    var tiles = [
+      { ic: "💬", v: String(t.msgs), k: "messages conservés" },
+      { ic: "🖼", v: String(t.images), k: "images" },
+      { ic: "🧾", v: String(t.sites), k: "pages web" },
+      { ic: "💾", v: humanBytes(storageBytes()), k: "sur cet appareil" }
+    ];
+    els.metrics.innerHTML = "";
+    tiles.forEach(function (m) {
+      var d = document.createElement("div");
+      d.className = "metric";
+      var i = document.createElement("div"); i.className = "ic"; i.textContent = m.ic;
+      var b = document.createElement("b"); b.textContent = m.v;
+      var s = document.createElement("small"); s.textContent = m.k;
+      d.appendChild(i); d.appendChild(b); d.appendChild(s);
+      els.metrics.appendChild(d);
+    });
+  }
+
+  var QUICK = [
+    { ic: "🖼", t: "Générer une image", s: "décris, Mob dessine", q: "Génère une image de " },
+    { ic: "🧾", t: "Écrire une page web", s: "un fichier HTML complet", q: "Programme-moi une page web qui " },
+    { ic: "📝", t: "Résumer un texte", s: "colle, Mob condense", q: "Résume ce texte : " },
+    { ic: "💡", t: "Trouver des idées", s: "dix pistes d'un coup", q: "Donne-moi dix idées pour " }
+  ];
+
+  function renderQuick() {
+    els.quick.innerHTML = "";
+    QUICK.forEach(function (a) {
+      var b = document.createElement("button");
+      b.type = "button";
+      var i = document.createElement("span"); i.className = "ic"; i.textContent = a.ic;
+      var t = document.createElement("b"); t.textContent = a.t;
+      var s = document.createElement("small"); s.textContent = a.s;
+      b.appendChild(i); b.appendChild(t); b.appendChild(s);
+      // Le texte est déposé dans la saisie plutôt qu'envoyé tel quel :
+      // il se termine par « … de », il attend d'être complété.
+      b.addEventListener("click", function () {
+        show("chat");
+        els.input.value = a.q;
+        autosize();
+        els.input.focus();
+      });
+      els.quick.appendChild(b);
+    });
+  }
+
+  /* ---------- graphique ---------- */
+
+  var RANGES = {
+    "1J": { buckets: 12, ms: 2 * 3600000, fmt: function (d) { return d.getHours() + "h"; } },
+    "1S": { buckets: 7,  ms: 86400000,    fmt: function (d) { return ["dim","lun","mar","mer","jeu","ven","sam"][d.getDay()]; } },
+    "1M": { buckets: 30, ms: 86400000,    fmt: function (d) { return d.getDate() + "/" + (d.getMonth() + 1); } },
+    "6M": { buckets: 26, ms: 7 * 86400000, fmt: function (d) { return d.getDate() + "/" + (d.getMonth() + 1); } },
+    "1A": { buckets: 12, ms: 30 * 86400000, fmt: function (d) { return ["jan","fév","mar","avr","mai","juin","juil","août","sep","oct","nov","déc"][d.getMonth()]; } }
+  };
+
+  function currentRange() {
+    var r = store.get("mob.range", "1M");
+    return RANGES[r] ? r : "1M";
+  }
+
+  els.ranges.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-range]");
+    if (!b) return;
+    store.set("mob.range", b.dataset.range);
+    renderChart();
+  });
+
+  function series(rangeKey) {
+    var r = RANGES[rangeKey];
+    var now = Date.now();
+    var start = now - r.buckets * r.ms;
+    var pts = [];
+    for (var i = 0; i < r.buckets; i++) {
+      var from = start + i * r.ms;
+      pts.push({ from: from, label: r.fmt(new Date(from)), v: countIn(from, from + r.ms, any) });
+    }
+    return pts;
+  }
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svgEl(name, attrs) {
+    var n = document.createElementNS(SVGNS, name);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  function renderChart() {
+    var key = currentRange();
+    var buttons = els.ranges.querySelectorAll("button[data-range]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", buttons[i].dataset.range === key ? "true" : "false");
+    }
+
+    els.chartHost.innerHTML = "";
+    var pts = series(key);
+    var max = 0;
+    pts.forEach(function (p) { if (p.v > max) max = p.v; });
+
+    if (!max) {
+      var none = document.createElement("div");
+      none.className = "chart-empty";
+      none.textContent = history.length
+        ? "Pas d'activité datée sur cette période."
+        : "Rien à afficher pour l'instant — pose ta première question.";
+      els.chartHost.appendChild(none);
+      return;
+    }
+
+    var W = Math.max(240, els.chartHost.clientWidth || 300), H = 168, PAD = 10;
+    var stepX = pts.length > 1 ? (W - 2 * PAD) / (pts.length - 1) : 0;
+    var scaleY = function (v) { return H - PAD - (v / max) * (H - 2 * PAD); };
+    var x = function (i) { return PAD + i * stepX; };
+
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img" });
+    svg.setAttribute("aria-label", "Activité sur " + key);
+
+    var defs = svgEl("defs");
+    var grad = svgEl("linearGradient", { id: "mobFill", x1: "0", y1: "0", x2: "0", y2: "1" });
+    grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "var(--accent)", "stop-opacity": ".38" }));
+    grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "var(--accent)", "stop-opacity": "0" }));
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    for (var g = 0; g <= 3; g++) {
+      var y = PAD + (g / 3) * (H - 2 * PAD);
+      svg.appendChild(svgEl("line", {
+        x1: PAD, y1: y, x2: W - PAD, y2: y,
+        stroke: "var(--line-soft)", "stroke-width": "1"
+      }));
+    }
+
+    var line = "", area = "";
+    pts.forEach(function (p, i) {
+      var px = x(i), py = scaleY(p.v);
+      line += (i ? " L" : "M") + px + " " + py;
+    });
+    area = line + " L" + x(pts.length - 1) + " " + (H - PAD) + " L" + x(0) + " " + (H - PAD) + " Z";
+
+    svg.appendChild(svgEl("path", { d: area, fill: "url(#mobFill)", stroke: "none" }));
+    svg.appendChild(svgEl("path", {
+      d: line, fill: "none", stroke: "var(--accent)", "stroke-width": "2.5",
+      "stroke-linejoin": "round", "stroke-linecap": "round"
+    }));
+
+    var marker = svgEl("circle", { r: "5", fill: "var(--accent)", stroke: "var(--panel)", "stroke-width": "3" });
+    svg.appendChild(marker);
+
+    els.chartHost.appendChild(svg);
+
+    var axis = document.createElement("div");
+    axis.className = "chart-x";
+    [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
+      var s = document.createElement("span");
+      s.textContent = pts[i].label;
+      axis.appendChild(s);
+    });
+    els.chartHost.appendChild(axis);
+
+    var tip = document.createElement("div");
+    tip.className = "tip";
+    els.chartHost.appendChild(tip);
+
+    // Le sommet est mis en avant d'emblée, comme l'infobulle de la référence ;
+    // le doigt ou la souris la déplacent ensuite.
+    var peak = 0;
+    pts.forEach(function (p, i) { if (p.v > pts[peak].v) peak = i; });
+
+    function highlight(i) {
+      var p = pts[i];
+      marker.setAttribute("cx", x(i));
+      marker.setAttribute("cy", scaleY(p.v));
+      tip.innerHTML = "";
+      var b = document.createElement("b");
+      b.textContent = p.v + (p.v > 1 ? " messages" : " message");
+      var s = document.createElement("small");
+      s.textContent = p.label;
+      tip.appendChild(b); tip.appendChild(s);
+      tip.style.left = Math.min(Math.max(x(i), 52), W - 52) + "px";
+      // Près du haut, l'infobulle passe sous le point : au-dessus, elle
+      // sortirait de la carte et recouvrirait le panneau précédent.
+      var y = scaleY(p.v);
+      var above = y > 54;
+      tip.style.top = y + "px";
+      tip.style.transform = above ? "translate(-50%, -120%)" : "translate(-50%, 28%)";
+    }
+    highlight(peak);
+
+    svg.addEventListener("pointermove", function (e) {
+      var box = svg.getBoundingClientRect();
+      var i = Math.round((e.clientX - box.left - PAD) / (stepX || 1));
+      highlight(Math.min(pts.length - 1, Math.max(0, i)));
+    });
+  }
+
+  /* ================= notifications ================= */
+
+  function ago(ts) {
+    var s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return "à l'instant";
+    if (s < 3600) return "il y a " + Math.round(s / 60) + " min";
+    if (s < 86400) return "il y a " + Math.round(s / 3600) + " h";
+    return "il y a " + Math.round(s / 86400) + " j";
+  }
+
+  function notices() {
+    var out = [];
+    if (!store.get("mob.key", "")) {
+      out.push(["🔑", "Aucune clé enregistrée", "Ajoute-la dans Réglages pour que Mob réponde.", true]);
+    } else {
+      out.push(["✅", "Compte connecté", "Clé ···" + store.get("mob.key", "").slice(-4) + " sur cet appareil.", false]);
+    }
+    var last = null;
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (typeof history[i].ts === "number") { last = history[i].ts; break; }
+    }
+    out.push(["🕑", "Dernière activité", last ? ago(last) : "aucune activité datée", false]);
+    var t = totals();
+    out.push(["🎨", "Créations", t.images + " image(s), " + t.sites + " page(s).", false]);
+    if (isAdmin()) out.push(["🛡️", "Mode administrateur actif", "Les réglages avancés sont ouverts.", false]);
+    return out;
+  }
+
+  function syncNotifs() {
+    var list = notices();
+    els.notifBody.innerHTML = "";
+    var urgent = false;
+    list.forEach(function (n) {
+      if (n[3]) urgent = true;
+      var row = document.createElement("div");
+      row.className = "note-line";
+      var i = document.createElement("span"); i.textContent = n[0];
+      var w = document.createElement("span");
+      var b = document.createElement("b"); b.textContent = n[1];
+      var s = document.createElement("small"); s.textContent = n[2];
+      w.appendChild(b); w.appendChild(s);
+      row.appendChild(i); row.appendChild(w);
+      els.notifBody.appendChild(row);
+    });
+    els.bellDot.hidden = !urgent;
+  }
+
+  function closeNotifs() {
+    els.notifs.hidden = true;
+    els.bell.setAttribute("aria-pressed", "false");
+  }
+
+  els.bell.addEventListener("click", function (e) {
+    e.stopPropagation();
+    syncNotifs();
+    var open = els.notifs.hidden;
+    els.notifs.hidden = !open;
+    els.bell.setAttribute("aria-pressed", open ? "true" : "false");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (els.notifs.hidden) return;
+    if (els.notifs.contains(e.target) || els.bell.contains(e.target)) return;
+    closeNotifs();
+  });
+
+  /* ================= conversation ================= */
 
   var SUGGESTIONS = [
-    "Génère une image de robot jaune",
+    "Génère une image de robot violet",
     "Programme-moi une page de compteur",
     "Explique-moi les trous noirs"
   ];
@@ -776,12 +1536,15 @@
   }
 
   function push(role, content) {
-    history.push({ role: role, content: content });
+    // L'horodatage est ce qui alimente le tableau de bord : sans lui,
+    // aucune courbe ni variation n'est calculable.
+    history.push({ role: role, content: content, ts: Date.now() });
     store.set("mob.history", history);
     render();
+    if (currentView === "home") renderHome();
   }
 
-  /* ---------- appel au modèle ---------- */
+  /* ================= appel au modèle ================= */
 
   function ask(text) {
     var key = store.get("mob.key", "");
@@ -841,7 +1604,7 @@
       .then(function () { busy = false; els.send.disabled = false; });
   }
 
-  /* ---------- voix ---------- */
+  /* ================= voix ================= */
 
   var speechUnlocked = false;
 
@@ -869,10 +1632,15 @@
   }
 
   var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recog = null, listening = false;
+  var recog = null, listening = false, recogTarget = els.input;
 
   if (!Recognition) {
+    // Sans dictée, le micro du composeur disparaît et celui de la barre de
+    // recherche devient un simple bouton d'envoi : aucun bouton mort.
     els.mic.style.display = "none";
+    els.askMic.textContent = "↑";
+    els.askMic.title = "Envoyer";
+    els.askMic.setAttribute("aria-label", "Envoyer");
   } else {
     recog = new Recognition();
     recog.lang = "fr-FR";
@@ -881,25 +1649,26 @@
     recog.onresult = function (e) {
       var t = "";
       for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-      els.input.value = t;
-      autosize();
+      recogTarget.value = t;
+      if (recogTarget === els.input) autosize();
     };
     recog.onerror = function () { stopListening(); };
     recog.onend = function () {
       stopListening();
-      var t = els.input.value.trim();
-      if (t && !busy) { els.input.value = ""; autosize(); ask(t); }
+      var t = recogTarget.value.trim();
+      if (t && !busy) { recogTarget.value = ""; if (recogTarget === els.input) autosize(); ask(t); }
     };
   }
 
-  function startListening() {
+  function startListening(target) {
     if (!recog || listening) return;
+    recogTarget = target;
     try { recog.start(); listening = true; els.mic.classList.add("listening"); }
     catch (e) { stopListening(); }
   }
   function stopListening() { listening = false; els.mic.classList.remove("listening"); }
 
-  /* ---------- saisie ---------- */
+  /* ================= saisie ================= */
 
   function autosize() {
     els.input.style.height = "auto";
@@ -921,10 +1690,34 @@
   els.send.addEventListener("click", function () { unlockSpeech(); submit(); });
   els.mic.addEventListener("click", function () {
     unlockSpeech();
-    listening ? recog.stop() : startListening();
+    listening ? recog.stop() : startListening(els.input);
   });
 
-  /* ---------- apparence ---------- */
+  // La barre « Demande à Mob » de l'en-tête : elle bascule dans la
+  // conversation, comme la recherche de la référence ouvre son résultat.
+  function submitAsk() {
+    var t = els.ask.value.trim();
+    if (!t || busy) return;
+    els.ask.value = "";
+    unlockSpeech();
+    ask(t);
+  }
+  els.ask.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); submitAsk(); }
+  });
+  els.askMic.addEventListener("click", function () {
+    unlockSpeech();
+    if (!recog) { submitAsk(); return; }
+    if (els.ask.value.trim()) { submitAsk(); return; }
+    listening ? recog.stop() : startListening(els.ask);
+  });
+
+  els.promoCta.addEventListener("click", function () {
+    show("chat");
+    els.input.focus();
+  });
+
+  /* ================= apparence ================= */
 
   var systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
@@ -935,7 +1728,7 @@
     var dark = choice === "dark" || (choice === "auto" && (!systemDark || systemDark.matches));
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#08070d" : "#ece8f4");
+    if (meta) meta.setAttribute("content", dark ? "#08070d" : "#eeeaf6");
     syncSeg(els.themeSeg, "themeChoice", choice);
   }
 
@@ -964,6 +1757,7 @@
     if (!b) return;
     store.set("mob.theme", b.dataset.themeChoice);
     applyTheme();
+    if (currentView === "home") renderChart();
   });
 
   els.sizeSeg.addEventListener("click", function (e) {
@@ -973,7 +1767,19 @@
     applySize();
   });
 
-  /* ---------- compte ---------- */
+  /* ================= compte et profil ================= */
+
+  function syncProfile() {
+    var name = displayName();
+    var connected = !!store.get("mob.key", "");
+    els.profileName.textContent = name || "Invité";
+    els.profileRole.textContent = !connected ? "Non connecté"
+      : isAdmin() ? "Administrateur" : "Utilisateur";
+    els.avatar.textContent = (name ? name.charAt(0) : "M").toUpperCase();
+    if (currentView === "home") {
+      els.headTitleText.textContent = name ? "Bonjour, " + name : "Bonjour";
+    }
+  }
 
   function syncAccount() {
     var key = store.get("mob.key", "");
@@ -992,6 +1798,8 @@
     // Le champ disparaît une fois connecté : c'est ce qui fait qu'on ne
     // redemande plus la clé à chaque passage dans les réglages.
     els.keyFields.hidden = connected;
+    els.displayNameInput.value = displayName();
+    syncProfile();
   }
 
   // Enregistrement immédiat : plus de bouton « Enregistrer » global, donc
@@ -1011,6 +1819,11 @@
     }
   });
 
+  els.displayNameInput.addEventListener("change", function () {
+    store.set("mob.name", els.displayNameInput.value.trim().slice(0, 24));
+    syncProfile();
+  });
+
   els.editKey.addEventListener("click", function () {
     els.keyFields.hidden = false;
     els.key.value = "";
@@ -1024,10 +1837,10 @@
     store.set("mob.history", history);
     syncAccount();
     render();
-    show("chat");
+    show("home");
   });
 
-  /* ---------- voix : réglages ---------- */
+  /* ================= voix : réglages ================= */
 
   function syncVoice() {
     var on = store.get("mob.speak", false);
@@ -1060,10 +1873,10 @@
     history = [];
     store.set("mob.history", history);
     render();
-    show("chat");
+    show("home");
   });
 
-  /* ---------- espace admin ---------- */
+  /* ================= espace admin ================= */
 
   function syncAdmin() {
     var on = isAdmin();
@@ -1074,10 +1887,9 @@
     els.adminSub.textContent = on
       ? "Mode administrateur actif."
       : "Réservé au propriétaire de l'instance.";
-    els.hello.textContent = on ? "Mob · Admin" : "Mob";
-    els.helloSub.textContent = on ? "Console d'administration" : "Ton assistant personnel";
     els.navSub.textContent = on ? "Admin" : "Assistant";
-    if (!on) show(store.get("mob.view", "chat") === "admin" ? "chat" : store.get("mob.view", "chat"));
+    syncProfile();
+    if (!on && currentView === "admin") show("home");
   }
 
   els.adminEnter.addEventListener("click", function () {
@@ -1095,7 +1907,7 @@
   els.adminLeave.addEventListener("click", function () {
     store.set("mob.admin", false);
     syncAdmin();
-    show("chat");
+    show("home");
   });
 
   els.model.addEventListener("change", function () { store.set("mob.model", els.model.value); });
@@ -1130,28 +1942,14 @@
     els.ctxVal.textContent = els.ctx.value + " messages";
     els.sysPrompt.value = systemPrompt();
 
-    var images = 0, sites = 0;
-    history.forEach(function (m) {
-      if (m.role !== "assistant") return;
-      if (/IMAGE\([^)]+\)/i.test(m.content)) images++;
-      if (extractHtml(m.content)) sites++;
-    });
-    els.statMsgs.textContent = history.length;
-    els.statImgs.textContent = images;
-    els.statSites.textContent = sites;
-
-    var bytes = 0;
-    try {
-      Object.keys(localStorage)
-        .filter(function (k) { return k.indexOf("mob.") === 0; })
-        .forEach(function (k) { bytes += (localStorage.getItem(k) || "").length; });
-    } catch (e) { /* stockage illisible */ }
-    els.statSize.textContent = bytes > 1024
-      ? (bytes / 1024).toFixed(1) + " Ko"
-      : bytes + " o";
+    var t = totals();
+    els.statMsgs.textContent = String(t.msgs);
+    els.statImgs.textContent = String(t.images);
+    els.statSites.textContent = String(t.sites);
+    els.statSize.textContent = humanBytes(storageBytes());
   }
 
-  /* ---------- créations ---------- */
+  /* ================= créations ================= */
 
   function renderCreations() {
     els.creations.innerHTML = "";
@@ -1202,7 +2000,7 @@
     });
   }
 
-  /* ---------- démarrage ---------- */
+  /* ================= démarrage ================= */
 
   applyTheme();
   applySize();
@@ -1212,6 +2010,15 @@
   els.rate.value = store.get("mob.rate", 1);
   els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
   render();
+
+  // Le graphique dépend de la largeur réelle du panneau : il faut le
+  // redessiner quand elle change, sinon il reste figé à l'ancienne taille.
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (currentView !== "home") return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(renderChart, 150);
+  });
 
   // Question passée dans l'adresse : ?q=... — c'est par là qu'arrive le
   // raccourci Siri, qui dicte puis ouvre Mob avec la question déjà posée.
@@ -1225,7 +2032,7 @@
   } else if (!store.get("mob.key", "")) {
     show("settings");
   } else {
-    show(store.get("mob.view", "chat"));
+    show(store.get("mob.view", "home"));
   }
 })();
 </script>

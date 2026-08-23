@@ -152,6 +152,51 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   pour les tâches ponctuelles qui le demandent — ne pas la construire
   sans que l'utilisateur le redemande explicitement.
 
+## Le tableau de bord — reproduit d'une référence, pas inventé
+
+L'utilisateur a envoyé une capture d'un tableau de bord financier
+(« Helios ») en disant **« Je veux exactement le même »**. La première
+tentative n'en reprenait que le style ; il a renvoyé la même image. La
+version actuelle en reproduit la **structure**, élément par élément, avec
+le contenu de Mob à la place du contenu financier :
+
+| Référence | Mob |
+|---|---|
+| Barre latérale, Settings/Support en bas | Barre latérale, Réglages/Aide épinglés en bas |
+| « Welcome, <nom> » + sous-titre | « Bonjour, <nom> » + sous-titre |
+| « Ask helios.ai anything » + micro | « Demande à Mob… » + micro, pose vraiment la question |
+| Cloche + icônes rondes + bloc profil | Idem — la cloche ouvre un vrai panneau d'état |
+| Onglets Market / Wallet / Tools | Aperçu / Activité / Outils, qui masquent vraiment des panneaux |
+| « Total Holding » + sélecteur de période | « Total des échanges » + période |
+| Carte promo en dégradé + bouton | Idem, le bouton ouvre la conversation |
+| Courbe + pilules 1D/1W/1M/6M/1Y + infobulle | Courbe + 1J/1S/1M/6M/1A + infobulle |
+| Watchlist avec ±% | « Ton activité » : questions, réponses, images, pages, avec variations |
+| Grille 2×2 « My Portfolio » | « Ton espace » : messages, images, pages, stockage |
+
+**Les chiffres sont réels.** Chaque message porte désormais un `ts`, et
+tout le tableau de bord en découle. Les messages d'avant cette version
+n'en ont pas : ils comptent dans le total, **jamais** dans une fenêtre de
+temps — les dater d'aujourd'hui gonflerait la courbe et les pourcentages.
+Ne « répare » pas ça en leur inventant une date.
+
+Deux pièges CSS trouvés uniquement en regardant les captures, pas par les
+contrôles automatiques — tous deux de la même famille : **une règle
+générale de formulaire écrasait une règle de composant à spécificité
+égale, parce qu'elle est déclarée plus loin dans la feuille.**
+
+- `input[type=text] { width: 100%; background: … }` reprenait le dessus
+  sur `.askbar input` : la barre de recherche affichait une boîte grise
+  dans la pilule. Corrigé en ciblant `.askbar input[type="text"]`.
+- `select { width: 100% }` étirait `select.mini` sur toute la carte.
+- L'infobulle du graphique se positionnait contre `.chart-wrap` (le
+  panneau entier) au lieu du graphique : elle sortait de la carte. Il
+  faut `#chartHost { position: relative }`, et basculer l'infobulle sous
+  le point quand celui-ci est trop haut.
+
+Morale, à garder : **les contrôles au navigateur ne remplacent pas un
+coup d'œil aux captures.** 57 contrôles passaient au vert pendant que
+trois éléments étaient visiblement cassés.
+
 ## Interface : deux espaces, et ce qu'ils ne sont pas
 
 `docs/index.html` sépare un espace **utilisateur** (Chat, Créations,
@@ -186,6 +231,11 @@ MOB_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
 `MOB_CHROMIUM` sert quand la version de Playwright installée ne
 correspond pas au Chromium présent dans le conteneur — sans la variable,
 Playwright cherche son propre téléchargement.
+
+L'icône (`docs/icon.png`) est régénérée par `python3 tools/make-icon.py`
+— PNG écrit à la main en stdlib, aux couleurs du dégradé de l'app. Si tu
+changes la palette, relance-le : une icône jaune sur une app violette,
+c'est le genre de détail qui se remarque sur l'écran d'accueil.
 
 `.github/workflows/health-check.yml` lance la même suite **toutes les
 3 heures** sur le site en ligne, plus à chaque poussée sur `main` et sur
