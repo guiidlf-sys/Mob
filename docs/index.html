@@ -179,43 +179,15 @@
     <h2>Réglages</h2>
     <p class="sub">Tout reste sur cet appareil.</p>
 
-    <label for="provider">Fournisseur</label>
-    <select id="provider">
-      <option value="mistral">Mistral — palier gratuit</option>
-      <option value="anthropic">Claude — facturé à l'usage</option>
+    <label for="key">Clé d'API Mistral</label>
+    <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+
+    <label for="model">Modèle</label>
+    <select id="model">
+      <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
+      <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
+      <option value="mistral-large-latest">Mistral Large — le plus capable</option>
     </select>
-
-    <div id="mistralBlock">
-      <label for="key">Clé d'API Mistral</label>
-      <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
-
-      <label for="model">Modèle</label>
-      <select id="model">
-        <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
-        <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
-        <option value="mistral-large-latest">Mistral Large — le plus capable</option>
-      </select>
-    </div>
-
-    <div id="anthropicBlock" hidden>
-      <label for="keyAnthropic">Clé d'API Anthropic</label>
-      <input type="password" id="keyAnthropic" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-
-      <label for="modelAnthropic">Modèle</label>
-      <select id="modelAnthropic">
-        <option value="claude-opus-5">Claude Opus 5 — le plus capable (~2,6 ¢/question)</option>
-        <option value="claude-sonnet-5">Claude Sonnet 5 — équilibré (~1,6 ¢)</option>
-        <option value="claude-haiku-4-5">Claude Haiku 4.5 — rapide et bon marché (~0,5 ¢)</option>
-      </select>
-
-      <p class="note" style="margin-top:12px">
-        Chaque question est facturée sur ton compte Anthropic — il n'existe
-        pas de palier gratuit. Clé à créer sur
-        <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>.
-        Les estimations supposent une réponse courte avec le contexte des
-        24 derniers messages ; une longue réponse coûte davantage.
-      </p>
-    </div>
 
     <div class="row">
       <span>Lire les réponses à voix haute</span>
@@ -239,75 +211,7 @@
 (function () {
   "use strict";
 
-  // Les deux fournisseurs ne parlent pas le même dialecte : Mistral suit la
-  // forme « chat/completions » (message système glissé dans le tableau,
-  // réponse dans choices[0]), Anthropic met le système en paramètre de
-  // premier niveau, exige max_tokens, et renvoie un tableau de blocs dont
-  // seuls ceux de type "text" nous intéressent.
-  var PROVIDERS = {
-    mistral: {
-      url: "https://api.mistral.ai/v1/chat/completions",
-      defaultModel: "mistral-small-latest",
-      keyStore: "mob.key",
-      modelStore: "mob.model",
-      headers: function (key) {
-        return { "Content-Type": "application/json", "Authorization": "Bearer " + key };
-      },
-      body: function (model, recent) {
-        return {
-          model: model,
-          messages: [{ role: "system", content: SYSTEM }].concat(recent)
-        };
-      },
-      reply: function (data) {
-        return data && data.choices && data.choices[0] &&
-               data.choices[0].message && data.choices[0].message.content;
-      },
-      error: function (data) { return data && data.detail; }
-    },
-
-    anthropic: {
-      url: "https://api.anthropic.com/v1/messages",
-      defaultModel: "claude-opus-5",
-      keyStore: "mob.keyAnthropic",
-      modelStore: "mob.modelAnthropic",
-      headers: function (key) {
-        return {
-          "Content-Type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-          // Sans cet en-tête l'API refuse les appels venant d'un navigateur.
-          "anthropic-dangerous-direct-browser-access": "true"
-        };
-      },
-      body: function (model, recent) {
-        return {
-          model: model,
-          max_tokens: 16000,
-          system: SYSTEM,
-          messages: recent
-        };
-      },
-      reply: function (data) {
-        if (!data || !data.content) return null;
-        // La réponse peut contenir des blocs de raisonnement en plus du
-        // texte : on ne garde que le texte visible.
-        var text = data.content
-          .filter(function (b) { return b.type === "text"; })
-          .map(function (b) { return b.text; })
-          .join("");
-        if (data.stop_reason === "refusal") {
-          return text || "Claude a refusé de répondre à cette demande.";
-        }
-        return text;
-      },
-      error: function (data) { return data && data.error && data.error.message; }
-    }
-  };
-
-  function currentProvider() {
-    return PROVIDERS[store.get("mob.provider", "mistral")] || PROVIDERS.mistral;
-  }
+  var API = "https://api.mistral.ai/v1/chat/completions";
 
   // Fenêtre de contexte envoyée au modèle. L'historique complet reste sur
   // l'appareil ; seule cette tranche part à chaque tour, parce que la
@@ -347,19 +251,9 @@
     settingsForm: document.getElementById("settingsForm"),
     key: document.getElementById("key"),
     model: document.getElementById("model"),
-    provider: document.getElementById("provider"),
-    keyAnthropic: document.getElementById("keyAnthropic"),
-    modelAnthropic: document.getElementById("modelAnthropic"),
-    mistralBlock: document.getElementById("mistralBlock"),
-    anthropicBlock: document.getElementById("anthropicBlock"),
     speakPref: document.getElementById("speakPref"),
     clearHistory: document.getElementById("clearHistory")
   };
-
-  // Y a-t-il une clé pour le fournisseur actuellement choisi ?
-  function hasKey() {
-    return !!store.get(currentProvider().keyStore, "");
-  }
 
   /* ---------- rendu ---------- */
 
@@ -370,8 +264,8 @@
       var empty = document.createElement("div");
       empty.className = "empty";
       empty.innerHTML = "<strong>Mob est prêt.</strong>" +
-        (hasKey() ? "Pose une question, ou touche 🎙 pour parler."
-                  : "Commence par ajouter ta clé d'API dans ⚙.");
+        (store.get("mob.key", "") ? "Pose une question, ou touche 🎙 pour parler."
+                                  : "Commence par ajouter ta clé d'API dans ⚙.");
       els.messages.appendChild(empty);
       return;
     }
@@ -413,10 +307,9 @@
   /* ---------- appel API ---------- */
 
   function ask(text) {
-    var p = currentProvider();
-    var key = store.get(p.keyStore, "");
+    var key = store.get("mob.key", "");
     if (!key) {
-      push("error", "Aucune clé d'API pour ce fournisseur. Touche ⚙ pour en ajouter une.");
+      push("error", "Aucune clé d'API. Touche ⚙ pour en ajouter une.");
       els.settings.showModal();
       return;
     }
@@ -431,25 +324,32 @@
       .slice(-CONTEXT_WINDOW)
       .map(function (m) { return { role: m.role, content: m.content }; });
 
-    fetch(p.url, {
+    var payload = {
+      model: store.get("mob.model", "mistral-small-latest"),
+      messages: [{ role: "system", content: SYSTEM }].concat(recent)
+    };
+
+    fetch(API, {
       method: "POST",
-      headers: p.headers(key),
-      body: JSON.stringify(p.body(store.get(p.modelStore, p.defaultModel), recent))
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + key
+      },
+      body: JSON.stringify(payload)
     })
       .then(function (res) {
         return res.json().catch(function () { return null; }).then(function (data) {
           if (!res.ok) {
-            var detail = p.error(data) || ("erreur " + res.status);
+            var detail = (data && (data.detail || data.message)) || ("erreur " + res.status);
             if (typeof detail === "object") detail = JSON.stringify(detail);
             throw new Error(
-              res.status === 401 || res.status === 403
-                ? "Clé d'API refusée. Vérifie-la dans ⚙."
-              : res.status === 429
-                ? "Trop de requêtes d'un coup. Attends un instant."
+              res.status === 401 ? "Clé d'API refusée. Vérifie-la dans ⚙."
+              : res.status === 429 ? "Trop de requêtes d'un coup (limite du palier gratuit). Attends un instant."
               : detail
             );
           }
-          var content = p.reply(data);
+          var content = data && data.choices && data.choices[0] &&
+                        data.choices[0].message && data.choices[0].message.content;
           if (!content) throw new Error("Réponse de forme inattendue.");
           return content.trim();
         });
@@ -582,31 +482,16 @@
     els.speakPref.checked = on;
   }
 
-  function syncProviderBlocks() {
-    var anthropic = els.provider.value === "anthropic";
-    els.mistralBlock.hidden = anthropic;
-    els.anthropicBlock.hidden = !anthropic;
-  }
-
-  els.provider.addEventListener("change", syncProviderBlocks);
-
   els.openSettings.addEventListener("click", function () {
-    els.provider.value = store.get("mob.provider", "mistral");
     els.key.value = store.get("mob.key", "");
-    els.model.value = store.get("mob.model", PROVIDERS.mistral.defaultModel);
-    els.keyAnthropic.value = store.get("mob.keyAnthropic", "");
-    els.modelAnthropic.value = store.get("mob.modelAnthropic", PROVIDERS.anthropic.defaultModel);
+    els.model.value = store.get("mob.model", "mistral-small-latest");
     els.speakPref.checked = store.get("mob.speak", false);
-    syncProviderBlocks();
     els.settings.showModal();
   });
 
   els.settingsForm.addEventListener("submit", function () {
-    store.set("mob.provider", els.provider.value);
     store.set("mob.key", els.key.value.trim());
     store.set("mob.model", els.model.value);
-    store.set("mob.keyAnthropic", els.keyAnthropic.value.trim());
-    store.set("mob.modelAnthropic", els.modelAnthropic.value);
     store.set("mob.speak", els.speakPref.checked);
     syncVoiceButton();
     render();
@@ -624,11 +509,7 @@
 
   syncVoiceButton();
   render();
-  if (!hasKey()) {
-    els.provider.value = store.get("mob.provider", "mistral");
-    syncProviderBlocks();
-    els.settings.showModal();
-  }
+  if (!store.get("mob.key", "")) els.settings.showModal();
 })();
 </script>
 </body>

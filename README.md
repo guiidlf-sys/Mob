@@ -34,28 +34,6 @@ prix de gros détours :
 - **Voix dans les deux sens** : dictée (là où le navigateur la propose)
   et lecture à voix haute des réponses, activable par le bouton 🔊.
 - **Marche aussi sur le Mac**, même adresse.
-- **Deux fournisseurs au choix** dans ⚙, chacun avec sa propre clé :
-  **Mistral** (palier gratuit) ou **Claude** (facturé à l'usage, aucun
-  palier gratuit). On bascule de l'un à l'autre selon la question.
-
-### Choisir son fournisseur
-
-| | Mistral | Claude |
-|---|---|---|
-| Coût | gratuit | ~0,5 à 2,6 ¢ la question |
-| Capacité | correcte | nettement supérieure |
-| Compte requis | console.mistral.ai | console.anthropic.com |
-
-Ordres de grandeur pour Claude, sur une question courte avec le contexte
-des 24 derniers messages : **Opus 5** ~2,6 ¢, **Sonnet 5** ~1,6 ¢,
-**Haiku 4.5** ~0,5 ¢. Une réponse longue coûte davantage. À dix
-questions par jour, Opus 5 revient à environ 8 $/mois — souvent moins
-qu'un abonnement, puisqu'on ne paie que les jours où l'on s'en sert.
-
-Note technique : l'API d'Anthropic refuse les appels navigateur sans
-l'en-tête `anthropic-dangerous-direct-browser-access`. Mob l'envoie.
-La clé reste dans le `localStorage` de l'appareil, comme celle de
-Mistral — même niveau d'exposition, à savoir aucun côté dépôt.
 
 ### Activer l'hébergement (une seule fois)
 
