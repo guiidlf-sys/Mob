@@ -152,6 +152,35 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   pour les tâches ponctuelles qui le demandent — ne pas la construire
   sans que l'utilisateur le redemande explicitement.
 
+## Vérifier la web app — à faire à chaque modification
+
+`tests/ui-check.mjs` pilote un vrai navigateur et **clique réellement
+chaque bouton**, en vérifiant l'effet obtenu dans la page (le thème
+change-t-il vraiment ? la clé est-elle encore là après rechargement ?)
+plutôt que la simple présence des éléments dans le HTML.
+
+```
+cd docs && python3 -m http.server 8899 &
+MOB_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
+  node tests/ui-check.mjs http://localhost:8899/
+```
+
+`MOB_CHROMIUM` sert quand la version de Playwright installée ne
+correspond pas au Chromium présent dans le conteneur — sans la variable,
+Playwright cherche son propre téléchargement.
+
+`.github/workflows/health-check.yml` lance la même suite **toutes les
+3 heures** sur le site en ligne, plus à chaque poussée sur `main` et sur
+chaque pull request (là, contre la copie du dépôt, le site en ligne
+n'ayant pas encore les modifications). Un échec fait rougir l'onglet
+Actions et déclenche la notification GitHub habituelle.
+
+**Attente de l'utilisateur, à respecter à chaque modification :**
+terminer par une sauvegarde (commit + push) et lui redonner l'adresse
+**https://guiidlf-sys.github.io/Mob/**. Rappel : Pages sert depuis
+`main`, donc une modification n'atteint le site qu'une fois la pull
+request fusionnée.
+
 ## Conventions établies
 
 - **safe-eval, jamais `eval()` brut.** Toute évaluation d'expression

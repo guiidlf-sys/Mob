@@ -1,0 +1,15 @@
+{
+  "name": "mob",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Outillage de vérification de la web app Mob (docs/index.html).",
+  "type": "module",
+  "scripts": {
+    "check": "node tests/ui-check.mjs",
+    "check:local": "node tests/ui-check.mjs http://localhost:8899/"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  },
+  "license": "MIT"
+}

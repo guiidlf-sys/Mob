@@ -55,6 +55,44 @@ C'est le seul chemin vocal gratuit, et iOS 27 ne l'a pas changé : SiriKit
 y est retiré au profit des App Intents, mais ceux-ci exigent toujours
 l'autorisation Siri, réservée au compte Apple Developer payant.
 
+### Réglages
+
+Une vraie fenêtre de réglages, en cinq sections :
+
+| Section | Contenu |
+|---|---|
+| **Compte** | État connecté, repère de la clé (`···1234`), *Modifier*, *Se déconnecter* |
+| **Apparence** | Thème **Auto / Sombre / Clair**, taille du texte sur quatre crans |
+| **Voix** | Lecture à voix haute, vitesse de lecture |
+| **Conversation** | Modèle, mémoire relue à chaque question (4 à 60 messages) |
+| **Données** | Effacer la conversation |
+
+**La clé n'est demandée qu'une fois.** Une fois enregistrée, le champ
+disparaît et l'état passe à « Connecté » ; enregistrer un autre réglage
+ne l'efface pas, et un rechargement la retrouve. Seul *Se déconnecter*
+la supprime.
+
+⚠️ Sur iOS, **l'app ajoutée à l'écran d'accueil a un stockage distinct
+de Safari**. Si la clé semble redemandée, c'est presque toujours ça :
+il faut la saisir une fois dans chacun des deux. Ce n'est pas un oubli
+de l'app, ce sont deux emplacements séparés par le système.
+
+### Vérification automatique
+
+`tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
+en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
+survit-elle à un rechargement — plutôt que la présence des éléments
+dans le HTML. 26 contrôles.
+
+`.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
+sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull
+request. Un échec fait rougir l'onglet Actions.
+
+```
+cd docs && python3 -m http.server 8899 &
+node tests/ui-check.mjs http://localhost:8899/
+```
+
 ### Activer l'hébergement (une seule fois)
 
 Le dépôt est public, donc GitHub Pages est gratuit.

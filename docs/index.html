@@ -14,7 +14,25 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 
+<script>
+  // Posé avant le rendu pour éviter un éclair blanc à l'ouverture en
+  // thème sombre : le script principal, lui, est en fin de page.
+  (function () {
+    try {
+      var c = JSON.parse(localStorage.getItem("mob.theme") || '"auto"');
+      var dark = c === "dark" || (c === "auto" &&
+        (!window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      var fs = JSON.parse(localStorage.getItem("mob.size") || "16");
+      document.documentElement.style.setProperty("--fs", fs + "px");
+    } catch (e) { /* stockage indisponible : les valeurs par défaut suffisent */ }
+  })();
+</script>
+
 <style>
+  /* Thème sombre — celui par défaut. Le clair est plus bas ; c'est le
+     script qui pose data-theme sur <html>, y compris quand le réglage
+     est « automatique » (il résout alors la préférence du système). */
   :root {
     --bg: #0d0f14;
     --surface: #171a21;
@@ -27,6 +45,20 @@
     --user: #2a3140;
     --danger: #ff6b6b;
     --radius: 16px;
+    --fs: 16px;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eceff4;
+    --line: #dde1e8;
+    --text: #14171c;
+    --muted: #5c6672;
+    --accent: #a9790a;
+    --accent-ink: #ffffff;
+    --user: #dfe6f0;
+    --danger: #c0392b;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -36,8 +68,9 @@
     height: 100%;
     background: var(--bg);
     color: var(--text);
-    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    font: var(--fs)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     overscroll-behavior: none;
+    transition: background .2s, color .2s;
   }
 
   #app {
@@ -164,6 +197,53 @@
                    background: var(--muted); border-radius: 50%; transition: .2s; }
   .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
   .switch input:checked + .slider:before { transform: translateX(19px); background: var(--accent-ink); }
+
+  /* --- Réglages --- */
+  .sheet { max-height: 82dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  .section { margin-top: 26px; }
+  .section:first-of-type { margin-top: 12px; }
+  .section > h3 {
+    margin: 0 0 2px; font-size: 12px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  }
+  .section > .hint { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .section .row:first-of-type { margin-top: 10px; }
+
+  /* Contrôle segmenté (thème, taille du texte) */
+  .seg { display: flex; gap: 6px; margin-top: 8px; }
+  .seg button {
+    flex: 1; padding: 10px 6px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--muted); font: inherit; font-size: 14px;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600;
+  }
+
+  .state {
+    display: flex; align-items: center; gap: 9px;
+    padding: 12px 14px; border-radius: 12px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font-size: 14px; margin-top: 8px;
+  }
+  .state .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--danger); }
+  .state.on .dot { background: #35c759; }
+  .state .who { flex: 1; }
+  .state .who small { display: block; color: var(--muted); font-size: 12px; }
+
+  .link-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline;
+  }
+  .danger-btn {
+    width: 100%; margin-top: 10px; padding: 11px; border-radius: 11px; cursor: pointer;
+    border: 1px solid var(--danger); background: transparent;
+    color: var(--danger); font: inherit; font-size: 14px;
+  }
+
+  .range { width: 100%; accent-color: var(--accent); margin-top: 10px; }
+  .range-val { font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -191,30 +271,95 @@
     <h2>Réglages</h2>
     <p class="sub">Tout reste sur cet appareil.</p>
 
-    <label for="key">Clé d'API Mistral</label>
-    <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+    <!-- Compte -->
+    <div class="section">
+      <h3>Compte</h3>
+      <div class="state" id="accountState">
+        <span class="dot"></span>
+        <span class="who" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
+        <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+      </div>
 
-    <label for="model">Modèle</label>
-    <select id="model">
-      <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
-      <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
-      <option value="mistral-large-latest">Mistral Large — le plus capable</option>
-    </select>
+      <div id="keyFields">
+        <label for="key">Clé d'API Mistral</label>
+        <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+        <p class="hint" style="margin-top:8px">
+          Elle n'est demandée qu'une fois : elle reste dans ce navigateur et
+          te reconnecte automatiquement ensuite. Crée-la sur
+          <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+        </p>
+      </div>
 
-    <div class="row">
-      <span>Lire les réponses à voix haute</span>
-      <label class="switch"><input type="checkbox" id="speakPref"><span class="slider"></span></label>
+      <button type="button" class="danger-btn" id="signOut" hidden>Se déconnecter</button>
+    </div>
+
+    <!-- Apparence -->
+    <div class="section">
+      <h3>Apparence</h3>
+
+      <label>Thème</label>
+      <div class="seg" id="themeSeg" role="group" aria-label="Thème">
+        <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Sombre</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">Clair</button>
+      </div>
+      <p class="hint" style="margin-top:8px">« Auto » suit le réglage de ton iPhone.</p>
+
+      <label>Taille du texte</label>
+      <div class="seg" id="sizeSeg" role="group" aria-label="Taille du texte">
+        <button type="button" data-size="15" aria-pressed="false">Petit</button>
+        <button type="button" data-size="16" aria-pressed="false">Normal</button>
+        <button type="button" data-size="18" aria-pressed="false">Grand</button>
+        <button type="button" data-size="21" aria-pressed="false">Très grand</button>
+      </div>
+    </div>
+
+    <!-- Voix -->
+    <div class="section">
+      <h3>Voix</h3>
+      <div class="row">
+        <span>Lire les réponses à voix haute</span>
+        <label class="switch"><input type="checkbox" id="speakPref"><span class="slider"></span></label>
+      </div>
+
+      <label for="rate">Vitesse de lecture — <span class="range-val" id="rateVal">normale</span></label>
+      <input type="range" class="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+    </div>
+
+    <!-- Conversation -->
+    <div class="section">
+      <h3>Conversation</h3>
+
+      <label for="model">Modèle</label>
+      <select id="model">
+        <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
+        <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
+        <option value="mistral-large-latest">Mistral Large — le plus capable</option>
+      </select>
+
+      <label for="ctx">Mémoire envoyée — <span class="range-val" id="ctxVal">24 messages</span></label>
+      <input type="range" class="range" id="ctx" min="4" max="60" step="2" value="24">
+      <p class="hint" style="margin-top:8px">
+        Combien d'échanges passés Mob relit à chaque question. Plus haut, il
+        suit mieux le fil ; plus bas, il répond plus vite. Ton historique
+        complet est gardé quoi qu'il arrive.
+      </p>
+    </div>
+
+    <!-- Données -->
+    <div class="section">
+      <h3>Données</h3>
+      <p class="hint">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
+      <button type="button" class="danger-btn" id="clearHistory">Effacer la conversation</button>
     </div>
 
     <div class="btns">
-      <button type="button" class="ghost" id="clearHistory">Effacer l'historique</button>
+      <button type="button" class="ghost" id="closeSettings">Fermer</button>
       <button type="submit" class="primary">Enregistrer</button>
     </div>
 
     <p class="note">
-      Ta clé est stockée dans le navigateur de cet appareil uniquement — jamais
-      envoyée ailleurs que chez Mistral, jamais dans le code de cette page.
-      Crée-la sur <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+      Mob · <a href="https://github.com/guiidlf-sys/Mob" target="_blank" rel="noopener">code source</a>
     </p>
   </form>
 </dialog>
@@ -225,11 +370,11 @@
 
   var API = "https://api.mistral.ai/v1/chat/completions";
 
-  // Fenêtre de contexte envoyée au modèle. L'historique complet reste sur
-  // l'appareil ; seule cette tranche part à chaque tour, parce que la
-  // limite du modèle et la place sur le disque sont deux choses
+  // Fenêtre de contexte envoyée au modèle — réglable. L'historique complet
+  // reste sur l'appareil ; seule cette tranche part à chaque tour, parce
+  // que la limite du modèle et la place sur le disque sont deux choses
   // différentes.
-  var CONTEXT_WINDOW = 24;
+  function contextWindow() { return store.get("mob.ctx", 24); }
 
   var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
     "Réponds en français, de façon directe et utile. Sois bref quand la " +
@@ -291,7 +436,19 @@
     key: document.getElementById("key"),
     model: document.getElementById("model"),
     speakPref: document.getElementById("speakPref"),
-    clearHistory: document.getElementById("clearHistory")
+    clearHistory: document.getElementById("clearHistory"),
+    accountState: document.getElementById("accountState"),
+    accountWho: document.getElementById("accountWho"),
+    keyFields: document.getElementById("keyFields"),
+    editKey: document.getElementById("editKey"),
+    signOut: document.getElementById("signOut"),
+    closeSettings: document.getElementById("closeSettings"),
+    themeSeg: document.getElementById("themeSeg"),
+    sizeSeg: document.getElementById("sizeSeg"),
+    rate: document.getElementById("rate"),
+    rateVal: document.getElementById("rateVal"),
+    ctx: document.getElementById("ctx"),
+    ctxVal: document.getElementById("ctxVal")
   };
 
   /* ---------- rendu ---------- */
@@ -461,7 +618,7 @@
 
     var recent = history
       .filter(function (m) { return m.role === "user" || m.role === "assistant"; })
-      .slice(-CONTEXT_WINDOW)
+      .slice(-contextWindow())
       .map(function (m) { return { role: m.role, content: m.content }; });
 
     var payload = {
@@ -534,6 +691,7 @@
       speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "fr-FR";
+      u.rate = store.get("mob.rate", 1);
       speechSynthesis.speak(u);
     } catch (e) { /* idem */ }
   }
@@ -622,18 +780,147 @@
     els.speakPref.checked = on;
   }
 
+  /* ---------- apparence ---------- */
+
+  var systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  // « auto » n'est pas une valeur CSS : on la résout ici en interrogeant le
+  // système, et on repose data-theme en dur pour que la feuille de style
+  // n'ait que deux cas à connaître.
+  function applyTheme() {
+    var choice = store.get("mob.theme", "auto");
+    var dark = choice === "dark" || (choice === "auto" && (!systemDark || systemDark.matches));
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", dark ? "#0d0f14" : "#f6f7f9");
+    syncSeg(els.themeSeg, "theme-choice", choice);
+  }
+
+  // Si le réglage est « auto », suivre le système quand il bascule.
+  if (systemDark && systemDark.addEventListener) {
+    systemDark.addEventListener("change", function () {
+      if (store.get("mob.theme", "auto") === "auto") applyTheme();
+    });
+  }
+
+  function applySize() {
+    var px = store.get("mob.size", 16);
+    document.documentElement.style.setProperty("--fs", px + "px");
+    syncSeg(els.sizeSeg, "size", String(px));
+  }
+
+  // Un groupe de boutons se comporte comme un choix unique : un seul
+  // aria-pressed à true, qui sert aussi de style d'état sélectionné.
+  function syncSeg(group, attr, value) {
+    if (!group) return;
+    var buttons = group.querySelectorAll("button");
+    for (var i = 0; i < buttons.length; i++) {
+      var b = buttons[i];
+      b.setAttribute("aria-pressed", b.dataset[camel(attr)] === value ? "true" : "false");
+    }
+  }
+
+  function camel(s) {
+    return s.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
+  }
+
+  els.themeSeg.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-theme-choice]");
+    if (!b) return;
+    store.set("mob.theme", b.dataset.themeChoice);
+    applyTheme();
+  });
+
+  els.sizeSeg.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-size]");
+    if (!b) return;
+    store.set("mob.size", parseInt(b.dataset.size, 10));
+    applySize();
+  });
+
+  /* ---------- compte ---------- */
+
+  function syncAccount() {
+    var key = store.get("mob.key", "");
+    var connected = !!key;
+    els.accountState.className = "state" + (connected ? " on" : "");
+    els.accountWho.innerHTML = "";
+    els.accountWho.appendChild(document.createTextNode(connected ? "Connecté" : "Non connecté"));
+    var small = document.createElement("small");
+    small.textContent = connected
+      // Ne jamais réafficher la clé, même partiellement masquée : un repère
+      // suffit à reconnaître laquelle est en place.
+      ? "Clé ···" + key.slice(-4) + " — retenue sur cet appareil"
+      : "Ajoute ta clé pour commencer";
+    els.accountWho.appendChild(small);
+
+    els.editKey.hidden = !connected;
+    els.signOut.hidden = !connected;
+    // Une fois connecté, le champ disparaît : c'est ce qui fait qu'on ne
+    // redemande plus la clé à chaque ouverture des réglages.
+    els.keyFields.hidden = connected;
+  }
+
+  els.editKey.addEventListener("click", function () {
+    els.keyFields.hidden = false;
+    els.key.value = "";
+    els.key.focus();
+  });
+
+  els.signOut.addEventListener("click", function () {
+    if (!confirm("Se déconnecter ? La clé et la conversation seront effacées de cet appareil.")) return;
+    store.set("mob.key", "");
+    history = [];
+    store.set("mob.history", history);
+    syncAccount();
+    render();
+    els.settings.close();
+  });
+
+  /* ---------- curseurs ---------- */
+
+  function rateLabel(v) {
+    return v < 0.85 ? "lente" : v > 1.15 ? "rapide" : "normale";
+  }
+
+  els.rate.addEventListener("input", function () {
+    els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
+  });
+
+  els.ctx.addEventListener("input", function () {
+    els.ctxVal.textContent = els.ctx.value + " messages";
+  });
+
+  /* ---------- ouverture / enregistrement ---------- */
+
   els.openSettings.addEventListener("click", function () {
-    els.key.value = store.get("mob.key", "");
+    els.key.value = "";
     els.model.value = store.get("mob.model", "mistral-small-latest");
     els.speakPref.checked = store.get("mob.speak", false);
+    els.rate.value = store.get("mob.rate", 1);
+    els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
+    els.ctx.value = contextWindow();
+    els.ctxVal.textContent = els.ctx.value + " messages";
+    syncAccount();
+    applyTheme();
+    applySize();
     els.settings.showModal();
   });
 
+  els.closeSettings.addEventListener("click", function () { els.settings.close(); });
+
   els.settingsForm.addEventListener("submit", function () {
-    store.set("mob.key", els.key.value.trim());
+    // Champ vide alors qu'une clé existe = « je n'y touche pas », sinon
+    // rouvrir les réglages pour changer le thème effacerait la clé.
+    var typed = els.key.value.trim();
+    if (typed) store.set("mob.key", typed);
+
     store.set("mob.model", els.model.value);
     store.set("mob.speak", els.speakPref.checked);
+    store.set("mob.rate", parseFloat(els.rate.value));
+    store.set("mob.ctx", parseInt(els.ctx.value, 10));
     syncVoiceButton();
+    syncAccount();
     render();
   });
 
@@ -647,6 +934,8 @@
 
   /* ---------- démarrage ---------- */
 
+  applyTheme();
+  applySize();
   syncVoiceButton();
   render();
 
