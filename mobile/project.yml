@@ -1,0 +1,75 @@
+# XcodeGen manifest — generates Mob.xcodeproj so the first build doesn't
+# depend on clicking through Xcode's wizard and setting capabilities by
+# hand (every one of which is a chance to get it subtly wrong).
+#
+#   brew install xcodegen
+#   cd mobile && xcodegen generate && open Mob.xcodeproj
+#
+# The manual Xcode route still works and is documented in README.md; this
+# is the shortcut, not a replacement.
+name: Mob
+
+options:
+  # "Mob" is also the Siri invocation phrase, so the product name is
+  # load-bearing here — see Intents/MobShortcuts.swift.
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  LLM:
+    url: https://github.com/eastriverlee/LLM.swift
+    # Pinned to the 3.x line (latest tag at time of writing: v3.0.3).
+    # LLMEngine.swift was written against this major version's API —
+    # if you bump to 4.x, re-check Role/history/getCompletion first.
+    from: "3.0.3"
+
+targets:
+  Mob:
+    type: application
+    platform: iOS
+    sources:
+      - path: Mob
+    dependencies:
+      - package: LLM
+        product: LLM
+    info:
+      path: Mob/Info.plist
+      properties:
+        CFBundleDisplayName: Mob
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSMicrophoneUsageDescription: "Mob a besoin du micro pour t'écouter."
+        NSSpeechRecognitionUsageDescription: "Mob transcrit ta voix en local pour comprendre ta demande."
+        NSSiriUsageDescription: "Dis « Mob » pour lancer l'assistant."
+    entitlements:
+      path: Mob/Mob.entitlements
+      properties:
+        com.apple.developer.siri: true
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.example.Mob
+        com.apple.developer.ubiquity-container-identifiers:
+          - iCloud.com.example.Mob
+        com.apple.developer.icloud-services:
+          - CloudDocuments
+    settings:
+      base:
+        # CHANGE THIS to something unique to you (e.g. com.tonnom.Mob),
+        # and change the two iCloud container ids above to match
+        # (iCloud.<your bundle id>) — they must agree or the iCloud
+        # memory tier silently falls back to device storage.
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.Mob
+        # Set to your Apple ID's team, or leave empty and pick the team
+        # in Xcode's Signing & Capabilities tab on first open.
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Swift 5 language mode on purpose: Swift 6's strict concurrency
+        # checking would turn the actor-isolation annotations in this
+        # code into hard errors rather than warnings on a first build.
+        SWIFT_VERSION: "5.0"
+        # iPhone only — this is a personal-use app for one phone.
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO

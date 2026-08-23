@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Mob</title>
+
+<!-- Ajouté à l'écran d'accueil, iOS lance la page en plein écran sans
+     la barre Safari, avec son propre nom sous l'icône. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mob">
+<meta name="theme-color" content="#0d0f14">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #171a21;
+    --surface-2: #1f232c;
+    --line: #2a2f3a;
+    --text: #e8eaed;
+    --muted: #9aa1ad;
+    --accent: #f0b429;
+    --accent-ink: #241a00;
+    --user: #2a3140;
+    --danger: #ff6b6b;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+  header .mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 15px;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header .spacer { flex: 1; }
+
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); font-size: 17px; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .msg { max-width: 88%; padding: 11px 14px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 5px; }
+  .msg.bot { align-self: flex-start; background: var(--surface); border-bottom-left-radius: 5px; }
+  .msg.error { align-self: stretch; background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; }
+
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
+  .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 17px; }
+
+  .thinking { align-self: flex-start; color: var(--muted); font-size: 14px; padding: 4px 2px; }
+  .thinking span { animation: blink 1.2s infinite; }
+  .thinking span:nth-child(2) { animation-delay: .2s; }
+  .thinking span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100% { opacity: .25 } 30% { opacity: 1 } }
+
+  #composer {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+  #input {
+    flex: 1; resize: none; max-height: 140px;
+    padding: 11px 14px; border-radius: 20px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--text); font: inherit; line-height: 1.4;
+  }
+  #input:focus { outline: none; border-color: var(--accent); }
+
+  .send { width: 42px; height: 42px; border-radius: 50%; border: none;
+          background: var(--accent); color: var(--accent-ink); font-size: 18px;
+          cursor: pointer; flex-shrink: 0; }
+  .send:disabled { opacity: .4; }
+  .mic { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+         border: 1px solid var(--line); background: var(--surface-2);
+         color: var(--text); font-size: 18px; cursor: pointer; }
+  .mic.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08) } }
+
+  dialog {
+    border: none; border-radius: 20px; padding: 0; width: min(440px, 92vw);
+    background: var(--surface); color: var(--text);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .sheet { padding: 20px; }
+  .sheet h2 { margin: 0 0 4px; font-size: 19px; }
+  .sheet p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  input[type=password], input[type=text], select {
+    width: 100%; padding: 11px 13px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--text); font: inherit;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+  .row span { font-size: 14.5px; }
+  .btns { display: flex; gap: 10px; margin-top: 22px; }
+  button.primary { flex: 1; padding: 12px; border-radius: 12px; border: none;
+                   background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+                 background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+  .note { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .note a { color: var(--accent); }
+
+  /* Interrupteur */
+  .switch { position: relative; width: 48px; height: 29px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--surface-2);
+            border: 1px solid var(--line); border-radius: 29px; transition: .2s; cursor: pointer; }
+  .slider:before { content: ""; position: absolute; width: 23px; height: 23px; left: 2px; top: 2px;
+                   background: var(--muted); border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .slider:before { transform: translateX(19px); background: var(--accent-ink); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="mark">M</div>
+    <h1>Mob</h1>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="voiceToggle" aria-pressed="false" title="Lecture à voix haute">🔊</button>
+    <button class="icon-btn" id="openSettings" title="Réglages">⚙</button>
+  </header>
+
+  <main id="messages"></main>
+
+  <div id="composer">
+    <button class="mic" id="mic" title="Dicter">🎙</button>
+    <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
+    <button class="send" id="send" title="Envoyer">↑</button>
+  </div>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" class="sheet" id="settingsForm">
+    <h2>Réglages</h2>
+    <p class="sub">Tout reste sur cet appareil.</p>
+
+    <label for="key">Clé d'API Mistral</label>
+    <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+
+    <label for="model">Modèle</label>
+    <select id="model">
+      <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
+      <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
+      <option value="mistral-large-latest">Mistral Large — le plus capable</option>
+    </select>
+
+    <div class="row">
+      <span>Lire les réponses à voix haute</span>
+      <label class="switch"><input type="checkbox" id="speakPref"><span class="slider"></span></label>
+    </div>
+
+    <div class="btns">
+      <button type="button" class="ghost" id="clearHistory">Effacer l'historique</button>
+      <button type="submit" class="primary">Enregistrer</button>
+    </div>
+
+    <p class="note">
+      Ta clé est stockée dans le navigateur de cet appareil uniquement — jamais
+      envoyée ailleurs que chez Mistral, jamais dans le code de cette page.
+      Crée-la sur <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+    </p>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  var API = "https://api.mistral.ai/v1/chat/completions";
+
+  // Fenêtre de contexte envoyée au modèle. L'historique complet reste sur
+  // l'appareil ; seule cette tranche part à chaque tour, parce que la
+  // limite du modèle et la place sur le disque sont deux choses
+  // différentes.
+  var CONTEXT_WINDOW = 24;
+
+  var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
+    "Réponds en français, de façon directe et utile. Sois bref quand la " +
+    "question est simple, développe seulement quand c'est nécessaire. " +
+    "Évite les formules de politesse creuses et les listes à puces quand " +
+    "une phrase suffit.";
+
+  var store = {
+    get: function (k, fallback) {
+      try {
+        var v = localStorage.getItem(k);
+        return v === null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set: function (k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé : on continue sans persistance */ }
+    }
+  };
+
+  var history = store.get("mob.history", []);
+  var busy = false;
+
+  var els = {
+    messages: document.getElementById("messages"),
+    input: document.getElementById("input"),
+    send: document.getElementById("send"),
+    mic: document.getElementById("mic"),
+    voiceToggle: document.getElementById("voiceToggle"),
+    settings: document.getElementById("settings"),
+    openSettings: document.getElementById("openSettings"),
+    settingsForm: document.getElementById("settingsForm"),
+    key: document.getElementById("key"),
+    model: document.getElementById("model"),
+    speakPref: document.getElementById("speakPref"),
+    clearHistory: document.getElementById("clearHistory")
+  };
+
+  /* ---------- rendu ---------- */
+
+  function render() {
+    els.messages.innerHTML = "";
+
+    if (!history.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.innerHTML = "<strong>Mob est prêt.</strong>" +
+        (store.get("mob.key", "") ? "Pose une question, ou touche 🎙 pour parler."
+                                  : "Commence par ajouter ta clé d'API dans ⚙.");
+      els.messages.appendChild(empty);
+      return;
+    }
+
+    history.forEach(function (m) {
+      var d = document.createElement("div");
+      d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
+      d.textContent = m.content;
+      els.messages.appendChild(d);
+    });
+
+    scrollDown();
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(function () {
+      els.messages.scrollTop = els.messages.scrollHeight;
+    });
+  }
+
+  function showThinking(on) {
+    var existing = document.getElementById("thinking");
+    if (existing) existing.remove();
+    if (!on) return;
+    var d = document.createElement("div");
+    d.className = "thinking";
+    d.id = "thinking";
+    d.innerHTML = "Mob réfléchit <span>·</span><span>·</span><span>·</span>";
+    els.messages.appendChild(d);
+    scrollDown();
+  }
+
+  function push(role, content) {
+    history.push({ role: role, content: content });
+    store.set("mob.history", history);
+    render();
+  }
+
+  /* ---------- appel API ---------- */
+
+  function ask(text) {
+    var key = store.get("mob.key", "");
+    if (!key) {
+      push("error", "Aucune clé d'API. Touche ⚙ pour en ajouter une.");
+      els.settings.showModal();
+      return;
+    }
+
+    push("user", text);
+    busy = true;
+    els.send.disabled = true;
+    showThinking(true);
+
+    var recent = history
+      .filter(function (m) { return m.role === "user" || m.role === "assistant"; })
+      .slice(-CONTEXT_WINDOW)
+      .map(function (m) { return { role: m.role, content: m.content }; });
+
+    var payload = {
+      model: store.get("mob.model", "mistral-small-latest"),
+      messages: [{ role: "system", content: SYSTEM }].concat(recent)
+    };
+
+    fetch(API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + key
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (!res.ok) {
+            var detail = (data && (data.detail || data.message)) || ("erreur " + res.status);
+            if (typeof detail === "object") detail = JSON.stringify(detail);
+            throw new Error(
+              res.status === 401 ? "Clé d'API refusée. Vérifie-la dans ⚙."
+              : res.status === 429 ? "Trop de requêtes d'un coup (limite du palier gratuit). Attends un instant."
+              : detail
+            );
+          }
+          var content = data && data.choices && data.choices[0] &&
+                        data.choices[0].message && data.choices[0].message.content;
+          if (!content) throw new Error("Réponse de forme inattendue.");
+          return content.trim();
+        });
+      })
+      .then(function (reply) {
+        showThinking(false);
+        push("assistant", reply);
+        speak(reply);
+      })
+      .catch(function (err) {
+        // Dégradation propre : un message lisible, jamais une page cassée.
+        showThinking(false);
+        push("error", err && err.message ? err.message
+                                         : "Impossible de joindre Mistral. Vérifie ta connexion.");
+      })
+      .then(function () {
+        busy = false;
+        els.send.disabled = false;
+      });
+  }
+
+  /* ---------- synthèse vocale ---------- */
+
+  var speechUnlocked = false;
+
+  // iOS n'autorise la synthèse vocale que si elle a d'abord été déclenchée
+  // par un geste de l'utilisateur. On la « débloque » silencieusement au
+  // premier appui, sinon les réponses arrivent muettes.
+  function unlockSpeech() {
+    if (speechUnlocked || !("speechSynthesis" in window)) return;
+    try {
+      var u = new SpeechSynthesisUtterance("");
+      u.volume = 0;
+      speechSynthesis.speak(u);
+      speechUnlocked = true;
+    } catch (e) { /* sans voix, l'app reste utilisable */ }
+  }
+
+  function speak(text) {
+    if (!store.get("mob.speak", false) || !("speechSynthesis" in window)) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "fr-FR";
+      speechSynthesis.speak(u);
+    } catch (e) { /* idem */ }
+  }
+
+  /* ---------- reconnaissance vocale ---------- */
+
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recog = null;
+  var listening = false;
+
+  if (!Recognition) {
+    // Safari iOS ne l'expose pas partout : on garde la saisie au clavier,
+    // qui elle marche toujours.
+    els.mic.style.display = "none";
+  } else {
+    recog = new Recognition();
+    recog.lang = "fr-FR";
+    recog.interimResults = true;
+    recog.continuous = false;
+
+    recog.onresult = function (e) {
+      var t = "";
+      for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      els.input.value = t;
+      autosize();
+    };
+    recog.onerror = function () { stopListening(); };
+    recog.onend = function () {
+      stopListening();
+      var t = els.input.value.trim();
+      if (t && !busy) { els.input.value = ""; autosize(); ask(t); }
+    };
+  }
+
+  function startListening() {
+    if (!recog || listening) return;
+    try {
+      recog.start();
+      listening = true;
+      els.mic.classList.add("listening");
+    } catch (e) { stopListening(); }
+  }
+
+  function stopListening() {
+    listening = false;
+    els.mic.classList.remove("listening");
+  }
+
+  /* ---------- événements ---------- */
+
+  function autosize() {
+    els.input.style.height = "auto";
+    els.input.style.height = Math.min(els.input.scrollHeight, 140) + "px";
+  }
+
+  function submit() {
+    var t = els.input.value.trim();
+    if (!t || busy) return;
+    els.input.value = "";
+    autosize();
+    ask(t);
+  }
+
+  els.input.addEventListener("input", autosize);
+  els.input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
+  els.send.addEventListener("click", function () { unlockSpeech(); submit(); });
+  els.mic.addEventListener("click", function () {
+    unlockSpeech();
+    listening ? recog.stop() : startListening();
+  });
+
+  els.voiceToggle.addEventListener("click", function () {
+    unlockSpeech();
+    var on = !store.get("mob.speak", false);
+    store.set("mob.speak", on);
+    syncVoiceButton();
+    if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+  });
+
+  function syncVoiceButton() {
+    var on = store.get("mob.speak", false);
+    els.voiceToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    els.voiceToggle.textContent = on ? "🔊" : "🔈";
+    els.speakPref.checked = on;
+  }
+
+  els.openSettings.addEventListener("click", function () {
+    els.key.value = store.get("mob.key", "");
+    els.model.value = store.get("mob.model", "mistral-small-latest");
+    els.speakPref.checked = store.get("mob.speak", false);
+    els.settings.showModal();
+  });
+
+  els.settingsForm.addEventListener("submit", function () {
+    store.set("mob.key", els.key.value.trim());
+    store.set("mob.model", els.model.value);
+    store.set("mob.speak", els.speakPref.checked);
+    syncVoiceButton();
+    render();
+  });
+
+  els.clearHistory.addEventListener("click", function () {
+    if (!confirm("Effacer toute la conversation ?")) return;
+    history = [];
+    store.set("mob.history", history);
+    render();
+    els.settings.close();
+  });
+
+  /* ---------- démarrage ---------- */
+
+  syncVoiceButton();
+  render();
+  if (!store.get("mob.key", "")) els.settings.showModal();
+})();
+</script>
+</body>
+</html>
