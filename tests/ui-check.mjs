@@ -246,6 +246,71 @@ await check("une clé invalide donne un message lisible, pas un plantage", async
 });
 
 /* ------------------------------------------------------------------ */
+group("lisibilité et robustesse");
+
+// Chacun de ces contrôles correspond à un défaut réellement trouvé :
+// ils sont là pour qu'il ne revienne pas.
+
+await check("en thème clair, les bulles se détachent du fond", async () => {
+  await page.evaluate(() => {
+    localStorage.setItem("mob.theme", JSON.stringify("light"));
+    localStorage.setItem("mob.key", JSON.stringify("cle-de-test"));
+    localStorage.setItem("mob.history", JSON.stringify([
+      { role: "user", content: "question" },
+      { role: "assistant", content: "réponse" },
+    ]));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+
+  const lum = (c) => { const [r, g, b] = c.match(/\d+/g).map(Number); return 0.299 * r + 0.587 * g + 0.114 * b; };
+  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const bot = await page.evaluate(() => getComputedStyle(document.querySelector(".msg.bot")).backgroundColor);
+  const usr = await page.evaluate(() => getComputedStyle(document.querySelector(".msg.user")).backgroundColor);
+
+  assert(Math.abs(lum(bot) - lum(bg)) > 6, `bulle Mob indistincte du fond (${bot} sur ${bg})`);
+  assert(Math.abs(lum(usr) - lum(bg)) > 6, `bulle utilisateur indistincte du fond (${usr} sur ${bg})`);
+});
+
+await check("les réglages tiennent dans l'écran", async () => {
+  await page.click("#openSettings");
+  const fits = await page.evaluate(() => {
+    const d = document.getElementById("settings");
+    return d.getBoundingClientRect().height <= window.innerHeight + 1;
+  });
+  assert(fits, "la fenêtre de réglages dépasse la hauteur de l'écran");
+  await page.click("#closeSettings");
+});
+
+await check("une conversation très longue ne sature pas l'affichage", async () => {
+  await page.evaluate(() => {
+    const many = [];
+    for (let i = 0; i < 400; i++) {
+      many.push({ role: i % 2 ? "assistant" : "user", content: "message " + i });
+    }
+    localStorage.setItem("mob.history", JSON.stringify(many));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const drawn = await page.locator(".msg").count();
+  assert(drawn > 0 && drawn <= 80, `${drawn} bulles dessinées pour 400 messages`);
+  assert(await page.locator(".older").count() === 1, "le repère « messages plus anciens » manque");
+});
+
+await check("une question dictée avant la clé n'est pas perdue", async () => {
+  await page.evaluate(() => {
+    localStorage.removeItem("mob.key");
+    localStorage.removeItem("mob.history");
+  });
+  await page.goto(`${URL_BASE}?q=question%20avant%20la%20cle`, { waitUntil: "domcontentloaded" });
+  assert(await page.locator("#settings").evaluate((d) => d.open), "les réglages auraient dû s'ouvrir");
+
+  await page.fill("#key", "cle-de-test");
+  await page.click('#settingsForm button[type="submit"]');
+  await page.waitForSelector(".msg.user", { timeout: 15000 });
+  const txt = await page.textContent(".msg.user");
+  assert(txt.includes("question avant la cle"), `question perdue (bulle : ${txt})`);
+});
+
+/* ------------------------------------------------------------------ */
 group("erreurs JavaScript");
 
 await check("aucune erreur JavaScript pendant toute la session", async () => {

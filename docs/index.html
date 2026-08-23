@@ -49,16 +49,16 @@
   }
 
   :root[data-theme="light"] {
-    --bg: #f6f7f9;
+    --bg: #e9edf3;
     --surface: #ffffff;
-    --surface-2: #eceff4;
-    --line: #dde1e8;
+    --surface-2: #dfe4ec;
+    --line: #c9d1dd;
     --text: #14171c;
-    --muted: #5c6672;
-    --accent: #a9790a;
+    --muted: #55606e;
+    --accent: #9a6f08;
     --accent-ink: #ffffff;
-    --user: #dfe6f0;
-    --danger: #c0392b;
+    --user: #c9d9ef;
+    --danger: #b3271b;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -131,6 +131,11 @@
     color: var(--accent); cursor: pointer;
   }
 
+  .older {
+    align-self: center; font-size: 12px; color: var(--muted);
+    padding: 4px 12px; border-radius: 999px; background: var(--surface-2);
+  }
+
   .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
   .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 17px; }
 
@@ -166,7 +171,7 @@
 
   dialog {
     border: none; border-radius: 20px; padding: 0; width: min(440px, 92vw);
-    background: var(--surface); color: var(--text);
+    max-height: 90dvh; background: var(--surface); color: var(--text);
   }
   dialog::backdrop { background: rgba(0,0,0,.6); }
   .sheet { padding: 20px; }
@@ -376,6 +381,10 @@
   // différentes.
   function contextWindow() { return store.get("mob.ctx", 24); }
 
+  // Nombre de bulles réellement dessinées. Sans plafond, une longue
+  // conversation ralentit chaque envoi.
+  var DRAWN_MESSAGES = 60;
+
   var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
     "Réponds en français, de façon directe et utile. Sois bref quand la " +
     "question est simple ; développe autant qu'il le faut quand c'est " +
@@ -423,6 +432,7 @@
 
   var history = store.get("mob.history", []);
   var busy = false;
+  var pendingQuestion = null;
 
   var els = {
     messages: document.getElementById("messages"),
@@ -466,7 +476,18 @@
       return;
     }
 
-    history.forEach(function (m) {
+    // Seules les dernières bulles sont dessinées : redessiner mille
+    // messages à chaque tour finirait par rendre la saisie poussive.
+    // L'historique complet reste stocké et continue d'alimenter le modèle.
+    var shown = history.slice(-DRAWN_MESSAGES);
+    if (history.length > shown.length) {
+      var older = document.createElement("div");
+      older.className = "older";
+      older.textContent = (history.length - shown.length) +
+        " messages plus anciens — conservés, mais non affichés";
+      els.messages.appendChild(older);
+    }
+    shown.forEach(function (m) {
       els.messages.appendChild(renderMessage(m));
     });
 
@@ -922,6 +943,14 @@
     syncVoiceButton();
     syncAccount();
     render();
+
+    // Une question dictée en attente part maintenant que la clé existe.
+    if (pendingQuestion && store.get("mob.key", "")) {
+      var q = pendingQuestion;
+      pendingQuestion = null;
+      unlockSpeech();
+      ask(q);
+    }
   });
 
   els.clearHistory.addEventListener("click", function () {
@@ -947,6 +976,9 @@
   if (asked) window.history.replaceState(null, "", location.pathname);
 
   if (!store.get("mob.key", "")) {
+    // Question dictée avant d'avoir configuré la clé : on la garde de côté
+    // au lieu de la perdre, et on la pose dès que la clé est enregistrée.
+    if (asked && asked.trim()) pendingQuestion = asked.trim();
     els.settings.showModal();
   } else if (asked && asked.trim()) {
     unlockSpeech();
