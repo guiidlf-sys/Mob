@@ -106,6 +106,25 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   fenêtre envoyée au modèle est bornée). Détails, limites et étapes de
   build manuelles dans `mobile/README.md` — à valider sur un Mac (ou
   iPad/service de build cloud, voir README) avant de continuer.
+- **Piste web app — `docs/index.html`, la plus aboutie à ce jour** :
+  page unique autonome (aucune dépendance, aucun build) qui appelle
+  l'API Mistral **directement depuis le navigateur** — vérifié que
+  `api.mistral.ai` renvoie bien `access-control-allow-origin: *`, donc
+  pas de proxy nécessaire. Servie par GitHub Pages depuis `docs/` (le
+  dépôt est public, donc gratuit) : https://guiidlf-sys.github.io/Mob/
+  Elle réunit ce que les autres pistes n'obtenaient qu'au prix de gros
+  détours : installable sur l'écran d'accueil sans Xcode ni signature ni
+  péremption à 7 jours, mémoire persistante en `localStorage`
+  (historique complet gardé, fenêtre de contexte bornée à 24 messages —
+  deux limites distinctes), dictée et lecture vocale, et ça marche
+  aussi sur le Mac. La clé d'API vit dans le `localStorage` du
+  navigateur : **jamais dans le fichier, jamais dans le dépôt** (le
+  dépôt est public — ne jamais y coder une clé en dur).
+  ⚠️ Une page publiée en Artifact claude.ai ne pourrait **pas** faire
+  ça : sa politique de sécurité bloque les appels vers des hôtes
+  externes, et le compte de l'utilisateur n'expose aucune capacité
+  permettant à une page d'interroger Claude (roster : `artifact`,
+  `downloads`, `mcp`, `self`).
 - **Piste raccourci Siri — `shortcut/README.md`, choisie en parallèle de
   l'app** : un raccourci iOS nommé `Mob` (dictée → API Mistral, palier
   gratuit → énoncé vocal). Elle existe parce qu'elle contourne tout le
