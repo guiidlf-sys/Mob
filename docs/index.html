@@ -208,11 +208,6 @@
         <option value="claude-haiku-4-5">Claude Haiku 4.5 — rapide et bon marché (~0,5 ¢)</option>
       </select>
 
-      <div class="row">
-        <span>Recherche web<br><small style="color:var(--muted)">Mob va chercher l'info à jour</small></span>
-        <label class="switch"><input type="checkbox" id="webSearch"><span class="slider"></span></label>
-      </div>
-
       <p class="note" style="margin-top:12px">
         Chaque question est facturée sur ton compte Anthropic — il n'existe
         pas de palier gratuit. Clé à créer sur
@@ -286,27 +281,12 @@
         };
       },
       body: function (model, recent) {
-        var b = {
+        return {
           model: model,
           max_tokens: 16000,
           system: SYSTEM,
           messages: recent
         };
-        // Outil côté serveur : la recherche s'exécute chez Anthropic, pas
-        // dans le navigateur — c'est ce qui la rend possible ici alors
-        // qu'une page web ne peut rien exécuter d'autre.
-        //
-        // La variante récente n'existe que sur les modèles récents ; la
-        // demander sur Haiku 4.5 fait échouer la requête, d'où le choix
-        // du type selon le modèle.
-        if (store.get("mob.websearch", true)) {
-          var recent = model.indexOf("opus") !== -1 || model.indexOf("sonnet") !== -1;
-          b.tools = [{
-            type: recent ? "web_search_20260209" : "web_search_20250305",
-            name: "web_search"
-          }];
-        }
-        return b;
       },
       reply: function (data) {
         if (!data || !data.content) return null;
@@ -337,9 +317,7 @@
 
   var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
     "Réponds en français, de façon directe et utile. Sois bref quand la " +
-    "question est simple ; développe autant qu'il le faut quand c'est " +
-    "justifié — code, raisonnement technique, explication de fond. " +
-    "Pour du code, donne-le en entier et prêt à utiliser. " +
+    "question est simple, développe seulement quand c'est nécessaire. " +
     "Évite les formules de politesse creuses et les listes à puces quand " +
     "une phrase suffit.";
 
@@ -372,7 +350,6 @@
     provider: document.getElementById("provider"),
     keyAnthropic: document.getElementById("keyAnthropic"),
     modelAnthropic: document.getElementById("modelAnthropic"),
-    webSearch: document.getElementById("webSearch"),
     mistralBlock: document.getElementById("mistralBlock"),
     anthropicBlock: document.getElementById("anthropicBlock"),
     speakPref: document.getElementById("speakPref"),
@@ -415,21 +392,16 @@
     });
   }
 
-  function showThinking(on, label) {
+  function showThinking(on) {
     var existing = document.getElementById("thinking");
     if (existing) existing.remove();
     if (!on) return;
     var d = document.createElement("div");
     d.className = "thinking";
     d.id = "thinking";
-    d.innerHTML = (label || "Mob réfléchit") +
-      " <span>·</span><span>·</span><span>·</span>";
+    d.innerHTML = "Mob réfléchit <span>·</span><span>·</span><span>·</span>";
     els.messages.appendChild(d);
     scrollDown();
-  }
-
-  function showSearching() {
-    showThinking(true, "🔍 Mob cherche sur le web");
   }
 
   function push(role, content) {
@@ -459,7 +431,29 @@
       .slice(-CONTEXT_WINDOW)
       .map(function (m) { return { role: m.role, content: m.content }; });
 
-    converse(p, key, recent)
+    fetch(p.url, {
+      method: "POST",
+      headers: p.headers(key),
+      body: JSON.stringify(p.body(store.get(p.modelStore, p.defaultModel), recent))
+    })
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (!res.ok) {
+            var detail = p.error(data) || ("erreur " + res.status);
+            if (typeof detail === "object") detail = JSON.stringify(detail);
+            throw new Error(
+              res.status === 401 || res.status === 403
+                ? "Clé d'API refusée. Vérifie-la dans ⚙."
+              : res.status === 429
+                ? "Trop de requêtes d'un coup. Attends un instant."
+              : detail
+            );
+          }
+          var content = p.reply(data);
+          if (!content) throw new Error("Réponse de forme inattendue.");
+          return content.trim();
+        });
+      })
       .then(function (reply) {
         showThinking(false);
         push("assistant", reply);
@@ -469,64 +463,12 @@
         // Dégradation propre : un message lisible, jamais une page cassée.
         showThinking(false);
         push("error", err && err.message ? err.message
-                                         : "Impossible de joindre le serveur. Vérifie ta connexion.");
+                                         : "Impossible de joindre Mistral. Vérifie ta connexion.");
       })
       .then(function () {
         busy = false;
         els.send.disabled = false;
       });
-  }
-
-  /**
-   * Un tour de conversation, avec reprise si le serveur met la main en
-   * pause. Quand un outil côté serveur (la recherche web) tourne longtemps,
-   * l'API rend la main avec stop_reason "pause_turn" au lieu d'une réponse
-   * finie : il faut lui renvoyer ce qu'elle a déjà produit pour qu'elle
-   * continue. Sans cette boucle, une recherche un peu longue se solderait
-   * par une réponse vide.
-   */
-  async function converse(p, key, messages) {
-    var convo = messages.slice();
-
-    for (var turn = 0; turn < 5; turn++) {
-      var data = await callOnce(p, key, convo);
-      var reply = p.reply(data);
-
-      if (data.stop_reason !== "pause_turn") {
-        if (!reply) throw new Error("Réponse de forme inattendue.");
-        return reply.trim();
-      }
-
-      // Renvoyer les blocs tels quels : ils contiennent l'état de l'outil.
-      convo = convo.concat([{ role: "assistant", content: data.content }]);
-      showSearching();
-    }
-
-    throw new Error("La recherche a pris trop de tours. Reformule ta question.");
-  }
-
-  async function callOnce(p, key, messages) {
-    var res = await fetch(p.url, {
-      method: "POST",
-      headers: p.headers(key),
-      body: JSON.stringify(p.body(store.get(p.modelStore, p.defaultModel), messages))
-    });
-
-    var data = null;
-    try { data = await res.json(); } catch (e) { /* corps illisible */ }
-
-    if (!res.ok) {
-      var detail = p.error(data) || ("erreur " + res.status);
-      if (typeof detail === "object") detail = JSON.stringify(detail);
-      throw new Error(
-        res.status === 401 || res.status === 403
-          ? "Clé d'API refusée. Vérifie-la dans ⚙."
-        : res.status === 429
-          ? "Trop de requêtes d'un coup. Attends un instant."
-        : detail
-      );
-    }
-    return data;
   }
 
   /* ---------- synthèse vocale ---------- */
@@ -654,7 +596,6 @@
     els.model.value = store.get("mob.model", PROVIDERS.mistral.defaultModel);
     els.keyAnthropic.value = store.get("mob.keyAnthropic", "");
     els.modelAnthropic.value = store.get("mob.modelAnthropic", PROVIDERS.anthropic.defaultModel);
-    els.webSearch.checked = store.get("mob.websearch", true);
     els.speakPref.checked = store.get("mob.speak", false);
     syncProviderBlocks();
     els.settings.showModal();
@@ -666,7 +607,6 @@
     store.set("mob.model", els.model.value);
     store.set("mob.keyAnthropic", els.keyAnthropic.value.trim());
     store.set("mob.modelAnthropic", els.modelAnthropic.value);
-    store.set("mob.websearch", els.webSearch.checked);
     store.set("mob.speak", els.speakPref.checked);
     syncVoiceButton();
     render();

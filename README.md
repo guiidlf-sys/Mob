@@ -38,25 +38,6 @@ prix de gros détours :
   **Mistral** (palier gratuit) ou **Claude** (facturé à l'usage, aucun
   palier gratuit). On bascule de l'un à l'autre selon la question.
 
-### Recherche web (Claude uniquement)
-
-Avec Claude, Mob peut **aller chercher l'information à jour** au lieu de
-répondre depuis la mémoire figée du modèle. Activable dans ⚙, allumé par
-défaut.
-
-Ça marche dans un navigateur parce que la recherche s'exécute **sur les
-serveurs d'Anthropic**, pas dans la page — c'est ce qui la distingue des
-capacités qu'une page web ne peut pas avoir (lire des fichiers, lancer
-des commandes). Quand la recherche prend du temps, l'API rend la main
-avec `stop_reason: "pause_turn"` au lieu d'une réponse finie ; Mob
-relance alors le tour jusqu'à cinq fois, sinon la réponse arriverait
-vide.
-
-Le type d'outil dépend du modèle : la variante récente
-(`web_search_20260209`) n'existe que sur Opus et Sonnet, donc Haiku 4.5
-bascule automatiquement sur la variante de base — la demander sur Haiku
-ferait échouer la requête.
-
 ### Choisir son fournisseur
 
 | | Mistral | Claude |
