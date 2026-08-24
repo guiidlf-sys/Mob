@@ -291,6 +291,22 @@ Piège CSS rencontré et corrigé, à ne pas réintroduire : l'attribut
 règle `[hidden] { display: none !important; }`, tout l'espace admin
 restait visible sans code.
 
+## Pas de lien vers le dépôt dans la page — et ce que ça ne fait pas
+
+L'utilisateur a demandé de retirer le lien « code source ». C'est fait, y
+compris celui de l'aide vers `shortcut/README.md` (le raccourci y est
+maintenant décrit en trois étapes, dans la page). Un contrôle empêche
+qu'un lien `github.com` revienne.
+
+**Ne présente jamais ça comme une protection du code.** Une page web est
+lisible par ses visiteurs : « Afficher la source » et les outils de
+développement montrent tout, et le dépôt est public de toute façon.
+Retirer le lien enlève un raccourci, rien d'autre. Rendre le dépôt privé
+demanderait un forfait GitHub payant pour que Pages continue de servir le
+site — et même là, le HTML et le JavaScript resteraient lisibles côté
+visiteur. C'est exactement la même limite que pour le code admin et pour
+la clé d'API : **une page statique ne cache rien**.
+
 ## Vérifier la web app — à faire à chaque modification
 
 `tests/ui-check.mjs` pilote un vrai navigateur et **clique réellement
