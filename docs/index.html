@@ -313,6 +313,37 @@
   .quick button b { display: block; font-size: 14px; font-weight: 620; margin-top: 7px; }
   .quick button small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
 
+  /* Bandeau de la conversation : son titre et le bouton « nouvelle ». */
+  .chat-bar { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; }
+  .chat-bar b {
+    flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chat-bar button {
+    flex-shrink: 0; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    font: inherit; font-size: 12.5px;
+  }
+
+  /* Journal des discussions. */
+  .hist-row {
+    display: flex; align-items: center; gap: 10px; padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .hist-row:first-of-type { border-top: none; }
+  .hist-open {
+    flex: 1; min-width: 0; text-align: left; cursor: pointer;
+    background: none; border: none; padding: 0; color: var(--text); font: inherit;
+  }
+  .hist-open b { display: block; font-size: 14px; font-weight: 600;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-open small { display: block; color: var(--muted); font-size: 11.5px; }
+  .hist-row.current .hist-open b { color: var(--accent); }
+  .hist-del {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 14px;
+  }
+
   /* ============ conversation ============ */
   #messages { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
   .msg { max-width: 88%; padding: 12px 15px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
@@ -483,6 +514,7 @@
       flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px;
       background: var(--panel); overflow: hidden; flex-direction: column;
     }
+    .chat-bar { padding: 0 24px 8px; }
     header.page-head { padding: 20px 24px 12px; flex-wrap: nowrap; align-items: center; }
     .head-text h1 { font-size: 26px; }
     .askbar { width: 250px; }
@@ -607,11 +639,34 @@
 
     <!-- ====== Conversation ====== -->
     <section class="view" id="view-chat">
+      <div class="chat-bar">
+        <b id="chatTitle">Nouvelle discussion</b>
+        <button type="button" id="newChat">＋ Nouvelle</button>
+      </div>
       <div class="scroll"><div id="messages"></div></div>
       <div id="composer">
         <button class="round" id="mic" type="button" title="Dicter">🎙</button>
         <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
         <button class="round primary" id="send" type="button" title="Envoyer">↑</button>
+      </div>
+    </section>
+
+    <!-- ====== Historique ====== -->
+    <section class="view" id="view-historique">
+      <div class="scroll">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Tes discussions</h2>
+            <button type="button" class="chip" id="newChat2">＋ Nouvelle</button>
+          </div>
+          <p class="sub">Chaque visite ouvre une discussion neuve ; les précédentes t'attendent ici.</p>
+          <div id="histList"></div>
+        </div>
+        <div class="card">
+          <h2>Tout effacer</h2>
+          <p class="sub">Supprime toutes les discussions de cet appareil. Irréversible.</p>
+          <button type="button" class="btn danger" id="clearAll">Effacer tout l'historique</button>
+        </div>
       </div>
     </section>
 
@@ -692,7 +747,7 @@
         <div class="card">
           <h2>Données</h2>
           <p class="sub">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
-          <button type="button" class="btn danger" id="clearHistory">Effacer la conversation</button>
+          <button type="button" class="btn danger" id="clearHistory">Effacer la discussion en cours</button>
         </div>
 
         <div class="card">
@@ -814,6 +869,7 @@
     <div class="nav-main">
       <button type="button" data-view="home" aria-current="page"><span class="ico">🏠</span><span class="lbl2">Accueil</span></button>
       <button type="button" data-view="chat"><span class="ico">💬</span><span class="lbl2">Chat</span></button>
+      <button type="button" data-view="historique"><span class="ico">🕘</span><span class="lbl2">Historique</span></button>
       <button type="button" data-view="creations"><span class="ico">🎨</span><span class="lbl2">Créations</span></button>
       <button type="button" data-view="admin" id="navAdmin" hidden><span class="ico">🛡️</span><span class="lbl2">Admin</span></button>
     </div>
@@ -859,13 +915,66 @@
     }
   };
 
+  function saveChats() { store.set("mob.chats", chats); }
+
+  function allMessages() {
+    var out = [];
+    for (var i = 0; i < chats.length; i++) out = out.concat(chats[i].messages);
+    if (chats.indexOf(current) === -1) out = out.concat(current.messages);
+    return out;
+  }
+
   function contextWindow() { return store.get("mob.ctx", 24); }
   function systemPrompt() { return store.get("mob.prompt", DEFAULT_PROMPT); }
   function isAdmin() { return store.get("mob.admin", false); }
   function adminCode() { return store.get("mob.adminCode", "mob"); }
   function displayName() { return (store.get("mob.name", "") || "").trim(); }
 
-  var history = store.get("mob.history", []);
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function titleOf(text) {
+    var t = String(text || "").replace(/\s+/g, " ").trim();
+    return t.length > 44 ? t.slice(0, 44) + "…" : (t || "Discussion");
+  }
+
+  function blankChat() {
+    return { id: uid(), title: "", created: Date.now(), updated: Date.now(), messages: [] };
+  }
+
+  // Le journal est la source de vérité ; « history » reste une référence
+  // vers les messages de la discussion en cours, pour que tout le code
+  // d'affichage écrit avant cette version continue de fonctionner.
+  function loadChats() {
+    var list = store.get("mob.chats", null);
+    if (Object.prototype.toString.call(list) === "[object Array]") return list;
+
+    // Migration : l'ancienne conversation unique devient la première du journal.
+    var old = store.get("mob.history", []);
+    list = [];
+    if (old && old.length) {
+      var first = null, last = null;
+      old.forEach(function (m) {
+        if (typeof m.ts !== "number") return;
+        if (first === null || m.ts < first) first = m.ts;
+        if (last === null || m.ts > last) last = m.ts;
+      });
+      var opener = null;
+      for (var i = 0; i < old.length; i++) if (old[i].role === "user") { opener = old[i].content; break; }
+      list.push({
+        id: uid(), title: titleOf(opener), messages: old,
+        created: first || Date.now(), updated: last || Date.now()
+      });
+    }
+    store.set("mob.chats", list);
+    try { localStorage.removeItem("mob.history"); } catch (e) { /* rien à faire */ }
+    return list;
+  }
+
+  var chats = loadChats();
+  // Chaque visite ouvre une discussion neuve : elle n'entre au journal
+  // qu'au premier message, sinon l'historique se remplirait de coquilles vides.
+  var current = blankChat();
+  var history = current.messages;
   var busy = false;
   var pendingQuestion = null;
   var currentView = "home";
@@ -895,6 +1004,8 @@
     model: el("model"), ctx: el("ctx"), ctxVal: el("ctxVal"),
     sysPrompt: el("sysPrompt"), resetPrompt: el("resetPrompt"), wipeAll: el("wipeAll"),
     creations: el("creations"),
+    chatTitle: el("chatTitle"), newChat: el("newChat"), newChat2: el("newChat2"),
+    histList: el("histList"), clearAll: el("clearAll"),
     statMsgs: el("statMsgs"), statImgs: el("statImgs"), statSites: el("statSites"), statSize: el("statSize")
   };
 
@@ -903,6 +1014,7 @@
   var TITLES = {
     home:      ["Bonjour", "Voici ce que Mob a fait pour toi."],
     chat:      ["Conversation", "Pose une question, demande une image ou une page."],
+    historique: ["Historique", "Retrouve et rouvre n'importe quelle discussion."],
     creations: ["Créations", "Tout ce que Mob a produit pour toi."],
     settings:  ["Réglages", "Compte, apparence, voix et données."],
     help:      ["Aide", "Démarrer, déclencher à la voix, savoir où vont les données."],
@@ -932,6 +1044,7 @@
     els.headSub.textContent = t[1];
 
     if (view === "home") renderHome();
+    if (view === "historique") renderHistory();
     if (view === "creations") renderCreations();
     if (view === "admin") renderAdmin();
     if (view === "settings") syncAccount();
@@ -988,10 +1101,10 @@
     return typeof m.ts === "number" && m.ts >= from && m.ts < to;
   }
 
-  function countIn(from, to, test) {
+  function countIn(pool, from, to, test) {
     var n = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (within(history[i], from, to) && test(history[i])) n++;
+    for (var i = 0; i < pool.length; i++) {
+      if (within(pool[i], from, to) && test(pool[i])) n++;
     }
     return n;
   }
@@ -1024,16 +1137,17 @@
     var now = Date.now();
     var curFrom = now - span, prevFrom = now - 2 * span;
 
-    var cur = countIn(curFrom, now + 1, any);
-    var prev = countIn(prevFrom, curFrom, any);
+    var pool = allMessages();
+    var cur = countIn(pool, curFrom, now + 1, any);
+    var prev = countIn(pool, prevFrom, curFrom, any);
 
     els.heroValue.textContent = String(cur);
     els.heroDelta.replaceWith(deltaBadgeInto(els.heroDelta, cur, prev));
-    els.heroNote.textContent = "sur " + history.length +
-      (history.length > 1 ? " messages conservés" : " message conservé");
+    els.heroNote.textContent = "sur " + pool.length +
+      (pool.length > 1 ? " messages conservés" : " message conservé");
     els.watchPeriod.textContent = days >= 365 ? "12 mois" : days + " j";
 
-    renderWatchlist(curFrom, prevFrom, now);
+    renderWatchlist(pool, curFrom, prevFrom, now);
     renderMetrics();
     renderQuick();
     renderChart();
@@ -1056,11 +1170,11 @@
     { ic: "🧾", name: "Pages générées", sub: "documents HTML", test: isSite }
   ];
 
-  function renderWatchlist(curFrom, prevFrom, now) {
+  function renderWatchlist(pool, curFrom, prevFrom, now) {
     els.watchlist.innerHTML = "";
     WATCH.forEach(function (w) {
-      var cur = countIn(curFrom, now + 1, w.test);
-      var prev = countIn(prevFrom, curFrom, w.test);
+      var cur = countIn(pool, curFrom, now + 1, w.test);
+      var prev = countIn(pool, prevFrom, curFrom, w.test);
 
       var row = document.createElement("div");
       row.className = "list-row";
@@ -1100,8 +1214,9 @@
   function humanBytes(b) { return b > 1024 ? (b / 1024).toFixed(1) + " Ko" : b + " o"; }
 
   function totals() {
-    var t = { msgs: history.length, images: 0, sites: 0 };
-    history.forEach(function (m) {
+    var pool = allMessages();
+    var t = { msgs: pool.length, images: 0, sites: 0, chats: chats.length };
+    pool.forEach(function (m) {
       if (isImage(m)) t.images++;
       if (isSite(m)) t.sites++;
     });
@@ -1111,10 +1226,10 @@
   function renderMetrics() {
     var t = totals();
     var tiles = [
+      { ic: "🕘", v: String(t.chats), k: "discussions" },
       { ic: "💬", v: String(t.msgs), k: "messages conservés" },
       { ic: "🖼", v: String(t.images), k: "images" },
-      { ic: "🧾", v: String(t.sites), k: "pages web" },
-      { ic: "💾", v: humanBytes(storageBytes()), k: "sur cet appareil" }
+      { ic: "🧾", v: String(t.sites), k: "pages web" }
     ];
     els.metrics.innerHTML = "";
     tiles.forEach(function (m) {
@@ -1182,10 +1297,11 @@
     var r = RANGES[rangeKey];
     var now = Date.now();
     var start = now - r.buckets * r.ms;
+    var pool = allMessages();
     var pts = [];
     for (var i = 0; i < r.buckets; i++) {
       var from = start + i * r.ms;
-      pts.push({ from: from, label: r.fmt(new Date(from)), v: countIn(from, from + r.ms, any) });
+      pts.push({ from: from, label: r.fmt(new Date(from)), v: countIn(pool, from, from + r.ms, any) });
     }
     return pts;
   }
@@ -1212,7 +1328,7 @@
     if (!max) {
       var none = document.createElement("div");
       none.className = "chart-empty";
-      none.textContent = history.length
+      none.textContent = allMessages().length
         ? "Pas d'activité datée sur cette période."
         : "Rien à afficher pour l'instant — pose ta première question.";
       els.chartHost.appendChild(none);
@@ -1322,12 +1438,14 @@
     } else {
       out.push(["✅", "Compte connecté", "Clé ···" + store.get("mob.key", "").slice(-4) + " sur cet appareil.", false]);
     }
+    var pool = allMessages();
     var last = null;
-    for (var i = history.length - 1; i >= 0; i--) {
-      if (typeof history[i].ts === "number") { last = history[i].ts; break; }
+    for (var i = pool.length - 1; i >= 0; i--) {
+      if (typeof pool[i].ts === "number") { last = pool[i].ts; break; }
     }
     out.push(["🕑", "Dernière activité", last ? ago(last) : "aucune activité datée", false]);
     var t = totals();
+    out.push(["🕘", "Discussions", t.chats + " conservée(s) dans l'historique.", false]);
     out.push(["🎨", "Créations", t.images + " image(s), " + t.sites + " page(s).", false]);
     if (isAdmin()) out.push(["🛡️", "Mode administrateur actif", "Les réglages avancés sont ouverts.", false]);
     return out;
@@ -1539,10 +1657,123 @@
     // L'horodatage est ce qui alimente le tableau de bord : sans lui,
     // aucune courbe ni variation n'est calculable.
     history.push({ role: role, content: content, ts: Date.now() });
-    store.set("mob.history", history);
+    current.updated = Date.now();
+    if (!current.title && role === "user") current.title = titleOf(content);
+    // Entrée au journal au premier message seulement.
+    if (chats.indexOf(current) === -1) chats.unshift(current);
+    saveChats();
     render();
+    syncChatBar();
     if (currentView === "home") renderHome();
+    if (currentView === "historique") renderHistory();
   }
+
+  /* ================= journal des discussions ================= */
+
+  function syncChatBar() {
+    els.chatTitle.textContent = current.title || "Nouvelle discussion";
+  }
+
+  function startNewChat() {
+    // Une discussion déjà vide n'a pas besoin d'être remplacée.
+    if (current.messages.length) {
+      current = blankChat();
+      history = current.messages;
+      render();
+    }
+    syncChatBar();
+    show("chat");
+  }
+
+  function openChat(id) {
+    for (var i = 0; i < chats.length; i++) {
+      if (chats[i].id !== id) continue;
+      current = chats[i];
+      history = current.messages;
+      render();
+      syncChatBar();
+      show("chat");
+      return;
+    }
+  }
+
+  function deleteChat(id) {
+    if (!confirm("Supprimer cette discussion ?")) return;
+    for (var i = 0; i < chats.length; i++) {
+      if (chats[i].id !== id) continue;
+      var wasCurrent = chats[i] === current;
+      chats.splice(i, 1);
+      saveChats();
+      if (wasCurrent) {
+        current = blankChat();
+        history = current.messages;
+        render();
+        syncChatBar();
+      }
+      break;
+    }
+    renderHistory();
+  }
+
+  function when(ts) {
+    var d = new Date(ts);
+    var today = new Date();
+    var sameDay = d.toDateString() === today.toDateString();
+    var hh = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+    return sameDay ? "aujourd'hui à " + hh
+                   : d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear() + " à " + hh;
+  }
+
+  function renderHistory() {
+    els.histList.innerHTML = "";
+    if (!chats.length) {
+      var p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "Aucune discussion enregistrée pour l'instant. " +
+        "Dès que tu poses une question, elle apparaît ici.";
+      els.histList.appendChild(p);
+      return;
+    }
+
+    chats.slice().sort(function (a, b) { return b.updated - a.updated; }).forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "hist-row" + (c === current ? " current" : "");
+
+      var open = document.createElement("button");
+      open.type = "button"; open.className = "hist-open";
+      var t = document.createElement("b");
+      t.textContent = c.title || "Discussion";
+      var sub = document.createElement("small");
+      sub.textContent = c.messages.length + " message" + (c.messages.length > 1 ? "s" : "") +
+        " · " + when(c.updated) + (c === current ? " · en cours" : "");
+      open.appendChild(t); open.appendChild(sub);
+      open.addEventListener("click", function () { openChat(c.id); });
+      row.appendChild(open);
+
+      var del = document.createElement("button");
+      del.type = "button"; del.className = "hist-del";
+      del.title = "Supprimer"; del.setAttribute("aria-label", "Supprimer cette discussion");
+      del.textContent = "🗑";
+      del.addEventListener("click", function () { deleteChat(c.id); });
+      row.appendChild(del);
+
+      els.histList.appendChild(row);
+    });
+  }
+
+  els.newChat.addEventListener("click", startNewChat);
+  els.newChat2.addEventListener("click", startNewChat);
+
+  els.clearAll.addEventListener("click", function () {
+    if (!confirm("Effacer toutes les discussions de cet appareil ?")) return;
+    chats = [];
+    saveChats();
+    current = blankChat();
+    history = current.messages;
+    render();
+    syncChatBar();
+    renderHistory();
+  });
 
   /* ================= appel au modèle ================= */
 
@@ -1833,11 +2064,14 @@
   els.signOut.addEventListener("click", function () {
     if (!confirm("Se déconnecter ? La clé et la conversation seront effacées de cet appareil.")) return;
     store.set("mob.key", "");
-    history = [];
-    store.set("mob.history", history);
+    chats = [];
+    saveChats();
+    current = blankChat();
+    history = current.messages;
     syncAccount();
     render();
-    show("home");
+    syncChatBar();
+    show("chat");
   });
 
   /* ================= voix : réglages ================= */
@@ -1869,11 +2103,15 @@
   });
 
   els.clearHistory.addEventListener("click", function () {
-    if (!confirm("Effacer toute la conversation ?")) return;
-    history = [];
-    store.set("mob.history", history);
+    if (!confirm("Effacer la discussion en cours ?")) return;
+    var at = chats.indexOf(current);
+    if (at !== -1) chats.splice(at, 1);
+    saveChats();
+    current = blankChat();
+    history = current.messages;
     render();
-    show("home");
+    syncChatBar();
+    show("chat");
   });
 
   /* ================= espace admin ================= */
@@ -1954,7 +2192,7 @@
   function renderCreations() {
     els.creations.innerHTML = "";
     var images = [], sites = [];
-    history.forEach(function (m) {
+    allMessages().forEach(function (m) {
       if (m.role !== "assistant") return;
       var img = m.content.match(/IMAGE\(([^)]+)\)/i);
       if (img) images.push(img[1].trim());
@@ -2010,6 +2248,7 @@
   els.rate.value = store.get("mob.rate", 1);
   els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
   render();
+  syncChatBar();
 
   // Le graphique dépend de la largeur réelle du panneau : il faut le
   // redessiner quand elle change, sinon il reste figé à l'ancienne taille.
@@ -2032,7 +2271,9 @@
   } else if (!store.get("mob.key", "")) {
     show("settings");
   } else {
-    show(store.get("mob.view", "home"));
+    // Entrer sur le site ouvre une discussion neuve — les précédentes
+    // restent accessibles par l'onglet Historique.
+    show("chat");
   }
 })();
 </script>

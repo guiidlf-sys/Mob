@@ -26,11 +26,16 @@ prix de gros détours :
 - **Sur l'écran d'accueil** : « Partager → Sur l'écran d'accueil » lui
   donne son icône et la lance en plein écran, sans barre Safari. Elle se
   comporte alors comme une app.
-- **Mémoire persistante** : la conversation est conservée dans le
-  navigateur et survit à la fermeture. L'historique complet reste sur
-  l'appareil ; seuls les 24 derniers messages partent au modèle à chaque
-  tour, parce que la fenêtre de contexte d'un modèle et la place sur le
-  disque sont deux limites différentes.
+- **Une discussion neuve à chaque visite** : ouvrir Mob donne une page
+  blanche, jamais la conversation d'hier à moitié relue. Les précédentes
+  sont rangées dans l'onglet **Historique**, où on les rouvre, les
+  poursuit ou les supprime une par une. Une discussion restée vide n'y
+  entre pas.
+- **Mémoire persistante** : tout est conservé dans le navigateur et
+  survit à la fermeture. L'historique complet reste sur l'appareil ;
+  seuls les 24 derniers messages de la discussion en cours partent au
+  modèle à chaque tour, parce que la fenêtre de contexte d'un modèle et
+  la place sur le disque sont deux limites différentes.
 - **Voix dans les deux sens** : dictée (là où le navigateur la propose)
   et lecture à voix haute des réponses, activable par le bouton 🔊.
 - **Marche aussi sur le Mac** — la navigation devient une barre latérale
@@ -81,7 +86,7 @@ bas de l'écran.
 ### Deux espaces : utilisateur et administrateur
 
 L'interface est séparée en deux. Un visiteur ordinaire voit **Accueil**,
-**Chat**, **Créations**, **Réglages** et **Aide**. Le propriétaire ouvre
+**Chat**, **Historique**, **Créations**, **Réglages** et **Aide**. Le propriétaire ouvre
 en plus un onglet **Admin** avec ce qui engage le coût ou le
 comportement : choix du modèle, profondeur de mémoire, texte de
 personnalité, statistiques, effacement total.
@@ -105,7 +110,7 @@ Une vraie fenêtre de réglages, en cinq sections :
 | **Apparence** | Thème **Auto / Sombre / Clair**, taille du texte sur quatre crans |
 | **Voix** | Lecture à voix haute, vitesse de lecture |
 | **Conversation** | Modèle, mémoire relue à chaque question (4 à 60 messages) |
-| **Données** | Effacer la conversation |
+| **Données** | Effacer la discussion en cours |
 
 **La clé n'est demandée qu'une fois.** Une fois enregistrée, le champ
 disparaît et l'état passe à « Connecté » ; enregistrer un autre réglage
@@ -122,7 +127,7 @@ de l'app, ce sont deux emplacements séparés par le système.
 `tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
 en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
 survit-elle à un rechargement — plutôt que la présence des éléments
-dans le HTML. 60 contrôles.
+dans le HTML. 68 contrôles.
 
 `.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
 sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull

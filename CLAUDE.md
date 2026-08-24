@@ -197,6 +197,30 @@ Morale, à garder : **les contrôles au navigateur ne remplacent pas un
 coup d'œil aux captures.** 57 contrôles passaient au vert pendant que
 trois éléments étaient visiblement cassés.
 
+## Discussions multiples — le stockage a changé de forme
+
+`mob.history` (une seule conversation) a été remplacé par **`mob.chats`**,
+un tableau de `{id, title, created, updated, messages[]}`. Trois règles à
+ne pas défaire :
+
+- **Ouvrir le site crée une discussion neuve** et atterrit sur le Chat.
+  C'est une demande explicite de l'utilisateur, pas un défaut.
+- **Une discussion vide n'entre pas au journal** : elle n'y est inscrite
+  qu'au premier message. Sans ça, chaque ouverture laisserait une coquille.
+- **La migration est obligatoire et unique** : au premier chargement,
+  l'ancien `mob.history` devient la première discussion, puis la clé est
+  *supprimée*. Si tu la laisses, ses messages sont comptés deux fois dans
+  le tableau de bord.
+
+`history` reste une **référence vers `current.messages`** : c'est ce qui a
+permis de garder tout le code d'affichage écrit avant ce changement. Si tu
+réassignes `current`, réassigne `history` dans la foulée, sinon la vue
+continue d'afficher l'ancienne discussion.
+
+Les compteurs (tableau de bord, statistiques admin, galerie des créations)
+passent par `allMessages()`, qui parcourt **toutes** les discussions — pas
+seulement celle en cours.
+
 ## Interface : deux espaces, et ce qu'ils ne sont pas
 
 `docs/index.html` sépare un espace **utilisateur** (Chat, Créations,

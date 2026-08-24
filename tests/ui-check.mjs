@@ -67,6 +67,17 @@ const seed = (state) => page.evaluate((s) => {
   for (const [k, v] of Object.entries(s)) localStorage.setItem(k, JSON.stringify(v));
 }, state);
 
+/** Une discussion du journal, telle que l'app la stocke. */
+let chatCounter = 0;
+const chat = (messages, title = "Discussion de test") => ({
+  id: "test-" + (++chatCounter),
+  title,
+  created: Date.now(),
+  updated: Date.now(),
+  messages,
+});
+const seedChats = (list) => seed({ "mob.chats": list });
+
 await page.goto(URL_BASE, { waitUntil: "domcontentloaded" });
 
 /* ------------------------------------------------------------------ */
@@ -96,7 +107,7 @@ await check("sans clé, l'app conduit vers les réglages", async () => {
 group("navigation");
 
 await check("les vues de base s'ouvrent", async () => {
-  for (const view of ["home", "chat", "creations", "settings"]) {
+  for (const view of ["home", "chat", "historique", "creations", "settings"]) {
     await go(view);
     assert(await page.locator(`#view-${view}.active`).count() === 1, `vue ${view} inactive`);
   }
@@ -129,12 +140,13 @@ await check("l'accueil s'ouvre sur le tableau de bord", async () => {
 });
 
 await check("le chiffre principal compte l'activité de la période", async () => {
-  await seed({ "mob.history": [
+  await seedChats([chat([
     dated(1, "user", "hier"),
     dated(2, "assistant", "réponse IMAGE(a violet robot)"),
+  ]), chat([
     dated(3, "user", "avant-hier"),
     dated(40, "user", "il y a longtemps"),
-  ] });
+  ])]);
   await page.reload({ waitUntil: "domcontentloaded" });
   await go("home");
   assert((await page.textContent("#heroValue")) === "3",
@@ -158,7 +170,8 @@ await check("la liste d'activité détaille quatre lignes chiffrées", async () 
 
 await check("les quatre tuiles de « Ton espace » sont remplies", async () => {
   assert(await page.locator("#metrics .metric").count() === 4, "il manque des tuiles");
-  assert((await page.textContent("#metrics .metric:nth-child(1) b")) === "4", "total de messages faux");
+  assert((await page.textContent("#metrics .metric:nth-child(1) b")) === "2", "nombre de discussions faux");
+  assert((await page.textContent("#metrics .metric:nth-child(2) b")) === "4", "total de messages faux");
 });
 
 await check("le graphique est réellement tracé", async () => {
@@ -352,11 +365,11 @@ await check("les réglages avancés ne sont QUE dans l'espace admin", async () =
 });
 
 await check("les statistiques se remplissent", async () => {
-  await seed({ "mob.history": [
+  await seedChats([chat([
     { role: "user", content: "dessine" },
     { role: "assistant", content: "voilà IMAGE(a red cube)" },
     { role: "assistant", content: "```html\n<!doctype html><h1>Hello</h1>\n```" },
-  ] });
+  ])]);
   await page.reload({ waitUntil: "domcontentloaded" });
   await go("admin");
   assert((await page.textContent("#statMsgs")) === "3", "compte de messages faux");
@@ -387,9 +400,89 @@ await check("l'espace admin reste fermé après rechargement", async () => {
 });
 
 /* ------------------------------------------------------------------ */
+group("historique des discussions");
+
+await check("entrer sur le site ouvre une discussion neuve", async () => {
+  await seed({ "mob.key": "cle-de-test" });
+  await seedChats([chat([
+    { role: "user", content: "vieille question", ts: Date.now() - 3600000 },
+    { role: "assistant", content: "vieille réponse", ts: Date.now() - 3600000 },
+  ], "Vieille discussion")]);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation ne s'ouvre pas au lancement");
+  assert(await page.locator(".msg").count() === 0,
+    "la discussion précédente a été rouverte au lieu d'une neuve");
+  assert((await page.textContent("#chatTitle")) === "Nouvelle discussion", "le bandeau ne dit pas « nouvelle »");
+});
+
+await check("la discussion précédente est retrouvable dans l'historique", async () => {
+  await go("historique");
+  assert(await page.locator("#histList .hist-row").count() === 1, "le journal est vide");
+  assert((await page.textContent("#histList .hist-open b")) === "Vieille discussion",
+    "le titre de la discussion manque");
+});
+
+await check("rouvrir une discussion restaure ses messages", async () => {
+  await page.click("#histList .hist-open");
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation ne s'est pas ouverte");
+  assert(await page.locator(".msg").count() === 2, "les messages n'ont pas été restaurés");
+  assert((await page.textContent("#chatTitle")) === "Vieille discussion", "le bandeau n'a pas suivi");
+});
+
+await check("« ＋ Nouvelle » repart d'une page blanche sans rien perdre", async () => {
+  await page.click("#newChat");
+  assert(await page.locator(".msg").count() === 0, "la nouvelle discussion n'est pas vide");
+  await go("historique");
+  assert(await page.locator("#histList .hist-row").count() === 1,
+    "l'ancienne discussion a disparu du journal");
+});
+
+await check("une discussion vide n'entre pas au journal", async () => {
+  // Sans cette règle, chaque ouverture du site laisserait une coquille vide.
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.chats") || "[]").length);
+  assert(stored === 1, `${stored} discussions enregistrées au lieu d'une`);
+});
+
+await check("supprimer une discussion la retire vraiment", async () => {
+  await page.click("#histList .hist-del");
+  assert(await page.locator("#histList .hist-row").count() === 0, "la ligne est restée");
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.chats") || "[]").length);
+  assert(stored === 0, `${stored} discussions encore stockées`);
+});
+
+await check("l'ancienne conversation unique est reprise, pas perdue", async () => {
+  // Les utilisateurs de la version précédente ont un « mob.history » :
+  // il doit devenir la première discussion du journal, pas disparaître.
+  await page.evaluate(() => {
+    localStorage.removeItem("mob.chats");
+    localStorage.setItem("mob.history", JSON.stringify([
+      { role: "user", content: "question d'avant la mise à jour", ts: Date.now() - 7200000 },
+      { role: "assistant", content: "réponse d'avant", ts: Date.now() - 7200000 },
+    ]));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("historique");
+  assert(await page.locator("#histList .hist-row").count() === 1, "l'ancienne conversation a été perdue");
+  assert((await page.textContent("#histList .hist-open b")).includes("avant la mise à jour"),
+    "le titre repris est faux");
+  const legacy = await page.evaluate(() => localStorage.getItem("mob.history"));
+  assert(legacy === null, "l'ancienne clé subsiste et sera comptée deux fois");
+});
+
+await check("« Effacer tout l'historique » vide le journal", async () => {
+  await page.click("#clearAll");
+  assert(await page.locator("#histList .hist-row").count() === 0, "des discussions subsistent");
+});
+
+/* ------------------------------------------------------------------ */
 group("créations");
 
 await check("les images et pages générées sont regroupées", async () => {
+  await seedChats([chat([
+    { role: "assistant", content: "voilà IMAGE(a red cube)" },
+    { role: "assistant", content: "```html\n<!doctype html><h1>Hello</h1>\n```" },
+  ])]);
+  await page.reload({ waitUntil: "domcontentloaded" });
   await go("creations");
   assert(await page.locator("#creations .tile img").count() >= 1, "aucune image dans la galerie");
   assert(await page.locator("#creations .gen-actions button").count() >= 3,
@@ -420,10 +513,11 @@ await check("la vitesse de lecture met son libellé à jour", async () => {
   assert((await page.textContent("#rateVal")) === "lente", "libellé non mis à jour");
 });
 
-await check("« Effacer la conversation » vide bien la conversation", async () => {
+await check("« Effacer la discussion en cours » vide bien la conversation", async () => {
+  await go("settings");
   await page.click("#clearHistory");
-  const left = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.history") || "[]").length);
-  assert(left === 0, `${left} messages restants`);
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation ne s'est pas rouverte");
+  assert(await page.locator(".msg").count() === 0, "des bulles subsistent");
 });
 
 await check("le bouton d'envoi réagit à la saisie", async () => {
@@ -473,9 +567,11 @@ group("lisibilité et robustesse");
 await check("en thème clair, les bulles se détachent du fond", async () => {
   await seed({
     "mob.theme": "light", "mob.key": "cle-de-test",
-    "mob.history": [{ role: "user", content: "question" }, { role: "assistant", content: "réponse" }],
+    "mob.chats": [chat([{ role: "user", content: "question" }, { role: "assistant", content: "réponse" }])],
   });
   await page.reload({ waitUntil: "domcontentloaded" });
+  await go("historique");
+  await page.click("#histList .hist-open");
   const lum = (c) => { const [r, g, b] = c.match(/\d+/g).map(Number); return 0.299 * r + 0.587 * g + 0.114 * b; };
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   const bot = await page.evaluate(() => getComputedStyle(document.querySelector(".msg.bot")).backgroundColor);
@@ -506,11 +602,11 @@ await check("le sélecteur de période reste une pastille", async () => {
 });
 
 await check("l'infobulle du graphique reste dans sa carte", async () => {
-  await seed({ "mob.history": [
+  await seedChats([chat([
     { role: "user", content: "a", ts: Date.now() - 2 * 86400000 },
     { role: "assistant", content: "b", ts: Date.now() - 2 * 86400000 },
     { role: "user", content: "c", ts: Date.now() - 1 * 86400000 },
-  ] });
+  ])]);
   await page.reload({ waitUntil: "domcontentloaded" });
   await go("home");
   const inside = await page.evaluate(() => {
@@ -531,9 +627,13 @@ await check("une conversation très longue ne sature pas l'affichage", async () 
   await page.evaluate(() => {
     const many = [];
     for (let i = 0; i < 400; i++) many.push({ role: i % 2 ? "assistant" : "user", content: "message " + i });
-    localStorage.setItem("mob.history", JSON.stringify(many));
+    localStorage.setItem("mob.chats", JSON.stringify([{
+      id: "long", title: "Longue", created: Date.now(), updated: Date.now(), messages: many,
+    }]));
   });
   await page.reload({ waitUntil: "domcontentloaded" });
+  await go("historique");
+  await page.click("#histList .hist-open");
   const drawn = await page.locator(".msg").count();
   assert(drawn > 0 && drawn <= 80, `${drawn} bulles dessinées pour 400 messages`);
   assert(await page.locator(".older").count() === 1, "le repère « messages plus anciens » manque");
