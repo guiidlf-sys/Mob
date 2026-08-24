@@ -1,0 +1,38 @@
+name: Vérification du relais
+
+# Le relais garde la clé Mistral : une régression ici la ferait fuir ou
+# laisserait la dépense filer. La suite tourne sur le vrai moteur Cloudflare
+# (wrangler dev), avec un faux Mistral local — aucun jeton n'est dépensé et
+# aucun secret n'est nécessaire.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/relay-check.yml'
+  pull_request:
+    paths:
+      - 'worker/**'
+      - '.github/workflows/relay-check.yml'
+  workflow_dispatch:
+
+jobs:
+  verifier:
+    name: La clé reste côté serveur
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer Wrangler
+        run: npm install --no-audit --no-fund
+        working-directory: worker
+
+      - name: Vérifier le relais
+        run: node worker/test/relay.test.mjs

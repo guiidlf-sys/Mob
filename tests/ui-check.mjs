@@ -11,6 +11,7 @@
  * continue le remarque.
  */
 import { chromium } from "playwright";
+import http from "node:http";
 
 const URL_BASE = process.argv[2] || "https://guiidlf-sys.github.io/Mob/";
 
@@ -583,6 +584,124 @@ await check("une question dictée avant la clé n'est pas perdue", async () => {
   // réécrirait l'historique préparé par le contrôle suivant.
   await page.waitForSelector(".msg.error", { timeout: 30000 });
 });
+
+/* ------------------------------------------------------------------ */
+group("relais (clé côté serveur)");
+
+// Ce chemin ne se teste que sur une cible en http:// : une page servie en
+// https ne peut pas appeler un relais local (contenu mixte bloqué par le
+// navigateur). Sur le site en ligne, ces contrôles sont donc sautés — le
+// relais a par ailleurs sa propre suite, worker/test/relay.test.mjs.
+if (URL_BASE.startsWith("http://")) {
+  let vuParLeRelais = null;
+  const fauxRelais = http.createServer((req, res) => {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Content-Type": "application/json",
+    };
+    if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const recu = JSON.parse(body || "{}");
+      vuParLeRelais = { chemin: req.url, ...recu };
+      if (recu.code === "code-refuse") {
+        res.writeHead(401, cors);
+        res.end(JSON.stringify({ error: "Code d'accès inconnu." }));
+        return;
+      }
+      res.writeHead(200, cors);
+      res.end(JSON.stringify(
+        req.url === "/session"
+          ? { name: "Guillaume", role: recu.code === "code-chef" ? "admin" : "user", used: 3, limit: 50 }
+          : { content: "Réponse passée par le relais.", used: 4, limit: 50 }
+      ));
+    });
+  });
+  await new Promise((r) => fauxRelais.listen(8900, r));
+  const adresse = "http://localhost:8900";
+
+  const poserLeCode = async (valeur) => {
+    await go("settings");
+    if (await page.locator("#keyFields").isHidden()) await page.click("#editKey");
+    await page.fill("#code", valeur);
+    await page.locator("#code").dispatchEvent("change");
+  };
+
+  await check("sans relais configuré, le champ code est absent", async () => {
+    await seed({ "mob.relay": "", "mob.code": "", "mob.key": "", "mob.admin": false });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await go("settings");
+    assert(await page.locator("#codeField").isHidden(),
+      "le champ code s'affiche alors qu'aucun relais n'est renseigné");
+  });
+
+  await check("renseigner le relais fait apparaître le champ code", async () => {
+    await page.fill("#relay", adresse);
+    await page.locator("#relay").dispatchEvent("change");
+    assert(!(await page.locator("#codeField").isHidden()), "le champ code reste caché");
+  });
+
+  await check("un code refusé par le relais ne connecte pas", async () => {
+    await poserLeCode("code-refuse");
+    await page.waitForTimeout(400);
+    assert((await page.textContent("#accountWho")).includes("Non connecté"),
+      "l'app se croit connectée avec un code refusé");
+    const garde = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.code") || '""'));
+    assert(!garde, `code refusé retenu quand même : ${garde}`);
+  });
+
+  await check("un code accepté connecte et affiche le quota", async () => {
+    await poserLeCode("code-famille");
+    await page.waitForTimeout(400);
+    const txt = await page.textContent("#accountWho");
+    assert(txt.includes("Connecté"), `état : ${txt}`);
+    assert(txt.includes("3 / 50"), `quota non affiché : ${txt}`);
+    assert(vuParLeRelais.chemin === "/session", `chemin appelé : ${vuParLeRelais.chemin}`);
+  });
+
+  await check("la question passe par le relais, jamais par Mistral en direct", async () => {
+    const versMistral = [];
+    page.on("request", (r) => { if (r.url().includes("api.mistral.ai")) versMistral.push(r.url()); });
+    await go("chat");
+    await page.fill("#input", "question via relais");
+    await page.click("#send");
+    await page.waitForSelector(".msg.bot", { timeout: 10000 });
+    assert((await page.textContent(".msg.bot")).includes("passée par le relais"), "réponse du relais absente");
+    assert(vuParLeRelais.chemin === "/chat", `chemin appelé : ${vuParLeRelais.chemin}`);
+    assert(vuParLeRelais.code === "code-famille", "le code n'a pas été transmis");
+    assert(versMistral.length === 0, `appel direct à Mistral : ${versMistral[0]}`);
+  });
+
+  await check("aucune clé d'API n'est stockée quand on passe par le relais", async () => {
+    const cle = await page.evaluate(() => JSON.parse(localStorage.getItem("mob.key") || '""'));
+    assert(!cle, "une clé traîne dans le navigateur alors que le relais est utilisé");
+  });
+
+  await check("c'est le relais qui décide de l'accès admin", async () => {
+    assert(await page.locator("#navAdmin").isHidden(), "un simple utilisateur voit l'onglet Admin");
+    await poserLeCode("code-chef");
+    await page.waitForTimeout(400);
+    assert(!(await page.locator("#navAdmin").isHidden()), "l'admin reconnu ne voit pas son onglet");
+    await go("settings");
+    assert(!(await page.locator("#adminByRelay").isHidden()), "la mention « reconnu par le relais » manque");
+    assert(await page.locator("#adminUnlock").isHidden(),
+      "le code admin local reste proposé alors que le relais tranche");
+  });
+
+  await check("se déconnecter retire le code et l'accès admin", async () => {
+    await page.click("#signOut");
+    await go("settings");
+    assert((await page.textContent("#accountWho")).includes("Non connecté"), "toujours connecté");
+    assert(await page.locator("#navAdmin").isHidden(), "l'onglet Admin survit à la déconnexion");
+  });
+
+  await new Promise((r) => fauxRelais.close(r));
+  await seed({ "mob.relay": "" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+}
 
 /* ------------------------------------------------------------------ */
 group("lisibilité et robustesse");

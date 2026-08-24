@@ -716,8 +716,16 @@
             <input type="text" id="displayName" placeholder="Ton prénom" autocomplete="off">
           </div>
           <div id="keyFields">
+            <div class="field" id="codeField" hidden>
+              <label for="code">Code d'accès</label>
+              <input type="password" id="code" placeholder="le code qu'on t'a donné" autocomplete="off" spellcheck="false">
+              <p class="note">
+                Recommandé : la clé reste sur le serveur, tu n'as qu'un code.
+                Il peut être révoqué sans gêner les autres.
+              </p>
+            </div>
             <div class="field">
-              <label for="key">Clé d'API Mistral</label>
+              <label for="key" id="keyLabel">Clé d'API Mistral</label>
               <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
             </div>
             <p class="note">
@@ -725,6 +733,15 @@
               reconnecte ensuite. À créer sur
               <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
             </p>
+            <div class="field">
+              <label for="relay">Adresse du relais <span style="opacity:.7">— facultatif</span></label>
+              <input type="text" id="relay" placeholder="https://mob-relais.….workers.dev" autocomplete="off" spellcheck="false">
+              <p class="note">
+                Laisse vide si tu utilises ta propre clé. Renseigné ici, il ne
+                vaut que pour ce navigateur ; pour tout le monde, c'est
+                <code>RELAY_URL</code> qu'il faut remplir dans la page.
+              </p>
+            </div>
           </div>
           <button type="button" class="btn danger" id="signOut" hidden style="margin-top:12px">Se déconnecter</button>
         </div>
@@ -772,6 +789,10 @@
         <div class="card">
           <h2>Espace administrateur</h2>
           <p class="sub" id="adminSub">Réservé au propriétaire de l'instance.</p>
+          <div class="state on" id="adminByRelay" hidden style="margin-bottom:14px">
+            <span class="dot"></span>
+            <span class="who2">Administrateur reconnu par le relais<small>Vérifié côté serveur, pas seulement dans la page.</small></span>
+          </div>
           <div class="field" id="adminUnlock">
             <label for="adminCode">Code d'accès</label>
             <input type="password" id="adminCode" placeholder="code" autocomplete="off">
@@ -905,6 +926,14 @@
   "use strict";
 
   var API = "https://api.mistral.ai/v1/chat/completions";
+
+  // ┌──────────────────────────────────────────────────────────────────┐
+  // │ RELAIS — à remplir une seule fois, après avoir déployé le Worker │
+  // │ (voir worker/README.md). Exemple :                               │
+  // │   var RELAY_URL = "https://mob-relais.ton-compte.workers.dev";   │
+  // │ Laissé vide, Mob fonctionne comme avant : chacun sa propre clé.  │
+  // └──────────────────────────────────────────────────────────────────┘
+  var RELAY_URL = "";
   var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
   var DRAWN_MESSAGES = 60;
 
@@ -948,6 +977,15 @@
   function isAdmin() { return store.get("mob.admin", false); }
   function adminCode() { return store.get("mob.adminCode", "mob"); }
   function displayName() { return (store.get("mob.name", "") || "").trim(); }
+
+  // Le relais peut être posé dans le fichier (pour tout le monde) ou dans le
+  // navigateur (pour essayer sans redéployer la page).
+  function relayURL() {
+    return String(store.get("mob.relay", "") || RELAY_URL || "").trim().replace(/\/+$/, "");
+  }
+  function accessCode() { return String(store.get("mob.code", "") || "").trim(); }
+  function viaRelay() { return !!(relayURL() && accessCode()); }
+  function connected() { return viaRelay() || !!store.get("mob.key", ""); }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -1014,6 +1052,8 @@
     metrics: el("metrics"), quick: el("quick"), promoCta: el("promoCta"),
     accountState: el("accountState"), accountWho: el("accountWho"),
     displayNameInput: el("displayName"),
+    code: el("code"), codeField: el("codeField"), relay: el("relay"),
+    adminByRelay: el("adminByRelay"), keyLabel: el("keyLabel"),
     keyFields: el("keyFields"), key: el("key"), editKey: el("editKey"), signOut: el("signOut"),
     themeSeg: el("themeSeg"), sizeSeg: el("sizeSeg"),
     speakPref: el("speakPref"), rate: el("rate"), rateVal: el("rateVal"),
@@ -1530,12 +1570,12 @@
       strong.textContent = "Mob est prêt.";
       empty.appendChild(strong);
       var line = document.createElement("div");
-      line.textContent = store.get("mob.key", "")
+      line.textContent = connected()
         ? "Pose une question, ou touche 🎙 pour parler."
-        : "Ajoute ta clé juste en dessous, et c'est parti.";
+        : "Renseigne ton accès juste en dessous, et c'est parti.";
       empty.appendChild(line);
 
-      if (store.get("mob.key", "")) {
+      if (connected()) {
         var sg = document.createElement("div");
         sg.className = "suggest";
         SUGGESTIONS.forEach(function (s) {
@@ -1798,9 +1838,8 @@
   /* ================= appel au modèle ================= */
 
   function ask(text) {
-    var key = store.get("mob.key", "");
-    if (!key) {
-      // La question est gardée et posée dès que la clé arrive ; on reste
+    if (!connected()) {
+      // La question est gardée et posée dès que l'accès arrive ; on reste
       // sur la conversation, c'est le bandeau qui dit quoi faire.
       pendingQuestion = text;
       show("chat");
@@ -1817,32 +1856,7 @@
       .slice(-contextWindow())
       .map(function (m) { return { role: m.role, content: m.content }; });
 
-    fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify({
-        model: store.get("mob.model", "mistral-small-latest"),
-        messages: [{ role: "system", content: systemPrompt() }].concat(recent)
-      })
-    })
-      .then(function (res) {
-        return res.json().catch(function () { return null; }).then(function (data) {
-          if (!res.ok) {
-            var detail = (data && data.detail) || ("erreur " + res.status);
-            if (typeof detail === "object") detail = JSON.stringify(detail);
-            throw new Error(
-              res.status === 401 || res.status === 403
-                ? "Clé d'API refusée. Vérifie-la dans Réglages."
-              : res.status === 429 ? "Trop de requêtes d'un coup. Attends un instant."
-              : detail
-            );
-          }
-          var content = data && data.choices && data.choices[0] &&
-                        data.choices[0].message && data.choices[0].message.content;
-          if (!content) throw new Error("Réponse de forme inattendue.");
-          return content.trim();
-        });
-      })
+    callModel(recent)
       .then(function (reply) {
         showThinking(false);
         push("assistant", reply);
@@ -1855,6 +1869,62 @@
                                          : "Impossible de joindre le serveur. Vérifie ta connexion.");
       })
       .then(function () { busy = false; els.send.disabled = false; });
+  }
+
+  /**
+   * Deux chemins pour la même question : par le relais, qui détient la clé
+   * côté serveur, ou en direct avec la clé personnelle du navigateur. Le
+   * reste de l'app ne connaît que cette fonction.
+   */
+  function callModel(recent) {
+    var messages = [{ role: "system", content: systemPrompt() }].concat(recent);
+    var model = store.get("mob.model", "mistral-small-latest");
+
+    if (viaRelay()) {
+      return fetch(relayURL() + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: accessCode(), model: model, messages: messages })
+      }).then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          // Le relais parle français et ne recopie jamais le détail de
+          // Mistral : son message est affichable tel quel.
+          if (!res.ok) throw new Error((data && data.error) || ("Le relais a répondu " + res.status + "."));
+          if (!data || typeof data.content !== "string") throw new Error("Réponse de forme inattendue.");
+          if (typeof data.used === "number") {
+            store.set("mob.used", data.used);
+            store.set("mob.quota", data.limit);
+          }
+          return data.content.trim();
+        });
+      });
+    }
+
+    return fetch(API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + store.get("mob.key", "")
+      },
+      body: JSON.stringify({ model: model, messages: messages })
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          var detail = (data && data.detail) || ("erreur " + res.status);
+          if (typeof detail === "object") detail = JSON.stringify(detail);
+          throw new Error(
+            res.status === 401 || res.status === 403
+              ? "Clé d'API refusée. Vérifie-la dans Réglages."
+            : res.status === 429 ? "Trop de requêtes d'un coup. Attends un instant."
+            : detail
+          );
+        }
+        var content = data && data.choices && data.choices[0] &&
+                      data.choices[0].message && data.choices[0].message.content;
+        if (!content) throw new Error("Réponse de forme inattendue.");
+        return content.trim();
+      });
+    });
   }
 
   /* ================= voix ================= */
@@ -2036,28 +2106,83 @@
 
   function syncAccount() {
     var key = store.get("mob.key", "");
-    var connected = !!key;
-    els.accountState.className = "state" + (connected ? " on" : "");
-    els.accountWho.textContent = connected ? "Connecté" : "Non connecté";
+    var on = connected();
+    var quota = store.get("mob.quota", 0);
+    var used = store.get("mob.used", 0);
+
+    els.accountState.className = "state" + (on ? " on" : "");
+    els.accountWho.textContent = on ? "Connecté" : "Non connecté";
     var small = document.createElement("small");
-    // Ne jamais réafficher la clé : un repère suffit à la reconnaître.
-    small.textContent = connected
-      ? "Clé ···" + key.slice(-4) + " — retenue sur cet appareil"
-      : "Ajoute ta clé pour commencer";
+    // Ne jamais réafficher le secret : un repère suffit à le reconnaître.
+    if (viaRelay()) {
+      small.textContent = "Code ···" + accessCode().slice(-4) +
+        (quota ? " — " + used + " / " + quota + " messages aujourd'hui" : " — via le relais");
+    } else if (key) {
+      small.textContent = "Clé ···" + key.slice(-4) + " — retenue sur cet appareil";
+    } else {
+      small.textContent = "Ajoute ton code ou ta clé pour commencer";
+    }
     els.accountWho.appendChild(small);
 
-    els.editKey.hidden = !connected;
-    els.signOut.hidden = !connected;
-    // Le champ disparaît une fois connecté : c'est ce qui fait qu'on ne
-    // redemande plus la clé à chaque passage dans les réglages.
-    els.keyFields.hidden = connected;
+    els.editKey.hidden = !on;
+    els.signOut.hidden = !on;
+    // Les champs disparaissent une fois connecté : c'est ce qui fait qu'on
+    // ne redemande plus rien à chaque passage dans les réglages.
+    els.keyFields.hidden = on;
+    els.codeField.hidden = !relayURL();
+    els.keyLabel.textContent = relayURL()
+      ? "Ou ta propre clé d'API Mistral" : "Clé d'API Mistral";
+    els.relay.value = store.get("mob.relay", "");
     els.displayNameInput.value = displayName();
-    els.keyBanner.hidden = connected;
+    els.keyBanner.hidden = on;
     syncProfile();
   }
 
   // Enregistrement immédiat : plus de bouton « Enregistrer » global, donc
   // plus de risque qu'il réécrive la clé depuis un champ vide.
+  // Le code est vérifié par le relais avant d'être retenu : un code faux ne
+  // doit pas donner une interface qui se croit connectée.
+  els.code.addEventListener("change", function () {
+    var typed = els.code.value.trim();
+    if (!typed) return;
+    if (!relayURL()) {
+      alert("Renseigne d'abord l'adresse du relais.");
+      return;
+    }
+    els.code.value = "";
+    fetch(relayURL() + "/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: typed })
+    })
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (!res.ok) throw new Error((data && data.error) || "Le relais a refusé ce code.");
+          return data;
+        });
+      })
+      .then(function (data) {
+        store.set("mob.code", typed);
+        store.set("mob.used", data.used);
+        store.set("mob.quota", data.limit);
+        if (!displayName() && data.name) store.set("mob.name", data.name);
+        // L'admin est décidé par le serveur, pas par un code tapé dans la page.
+        store.set("mob.admin", data.role === "admin");
+        syncAdmin();
+        syncAccount();
+        render();
+        askPending();
+      })
+      .catch(function (err) {
+        alert(err && err.message ? err.message : "Relais injoignable.");
+      });
+  });
+
+  els.relay.addEventListener("change", function () {
+    store.set("mob.relay", els.relay.value.trim());
+    syncAccount();
+  });
+
   els.key.addEventListener("change", function () {
     var typed = els.key.value.trim();
     if (!typed) return;
@@ -2065,13 +2190,17 @@
     els.key.value = "";
     syncAccount();
     render();
-    if (pendingQuestion) {
-      var q = pendingQuestion;
-      pendingQuestion = null;
-      unlockSpeech();
-      ask(q);
-    }
+    askPending();
   });
+
+  /** Une question posée avant d'avoir un accès repart dès qu'il arrive. */
+  function askPending() {
+    if (!pendingQuestion) return;
+    var q = pendingQuestion;
+    pendingQuestion = null;
+    unlockSpeech();
+    ask(q);
+  }
 
   els.displayNameInput.addEventListener("change", function () {
     store.set("mob.name", els.displayNameInput.value.trim().slice(0, 24));
@@ -2092,10 +2221,13 @@
   els.signOut.addEventListener("click", function () {
     if (!confirm("Se déconnecter ? La clé et la conversation seront effacées de cet appareil.")) return;
     store.set("mob.key", "");
+    store.set("mob.code", "");
+    store.set("mob.admin", false);
     chats = [];
     saveChats();
     current = blankChat();
     history = current.messages;
+    syncAdmin();
     syncAccount();
     render();
     syncChatBar();
@@ -2148,8 +2280,12 @@
     var on = isAdmin();
     els.navAdmin.hidden = !on;
     els.adminBadge.hidden = !on;
-    els.adminUnlock.hidden = on;
-    els.adminLeave.hidden = !on;
+    var parRelais = on && viaRelay();
+    els.adminByRelay.hidden = !parRelais;
+    // Avec le relais, il n'y a rien à déverrouiller ni à quitter : c'est le
+    // code d'accès qui décide, et le serveur qui tranche.
+    els.adminUnlock.hidden = on || parRelais;
+    els.adminLeave.hidden = !on || parRelais;
     els.adminSub.textContent = on
       ? "Mode administrateur actif."
       : "Réservé au propriétaire de l'instance.";

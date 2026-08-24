@@ -1,0 +1,15 @@
+{
+  "name": "mob-relais",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Relais Cloudflare qui garde la clé Mistral hors du navigateur.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/relay.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}
