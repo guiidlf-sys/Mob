@@ -326,8 +326,25 @@ Playwright cherche son propre téléchargement.
 
 L'icône (`docs/icon.png`) est régénérée par `python3 tools/make-icon.py`
 — PNG écrit à la main en stdlib, aux couleurs du dégradé de l'app. Si tu
-changes la palette, relance-le : une icône jaune sur une app violette,
-c'est le genre de détail qui se remarque sur l'écran d'accueil.
+changes la palette, relance-le.
+
+**Le fantôme est dessiné deux fois, garde-les d'accord.** Le tracé SVG
+(constante `GHOST` dans `docs/index.html`, posée sur la pastille de la
+barre latérale, l'écran d'accueil de la conversation et l'avatar sans nom)
+et le tracé Python de `tools/make-icon.py` décrivent la **même** géométrie :
+coupole de rayon 46, flancs jusqu'à 96, trois lobes jusqu'à 118, yeux et
+bouche aux mêmes places. Une première version avait des proportions
+différentes entre les deux — l'icône et l'app montraient deux personnages.
+Si tu retouches l'un, retouche l'autre et regarde les deux rendus.
+
+Deux détails du dessin qui ont demandé une correction : les lobes du bas
+doivent avoir un **plancher** (`CREUX_MINI`), sinon ils se rejoignent en
+pointe et le fantôme ressemble à une mâchoire ; et les yeux et la bouche
+sont des **trous** (`fill-rule="evenodd"`), pas des formes coloriées, pour
+qu'ils laissent voir le dégradé quel que soit le support.
+
+C'est un fantôme générique, dessiné pour Mob — pas le logo de Snapchat,
+qui est une marque déposée. Ne le remplace pas par une copie de celui-ci.
 
 **Le rouge qui n'en est pas un** : juste après une fusion, le CDN de
 GitHub Pages sert encore l'ancienne page pendant une minute ou deux. La

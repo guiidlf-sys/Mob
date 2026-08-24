@@ -762,6 +762,17 @@ await check("l'infobulle du graphique reste dans sa carte", async () => {
   assert(inside, "l'infobulle sort de la carte du graphique");
 });
 
+await check("Mob se signe par son fantôme, pas par une lettre", async () => {
+  assert(await page.locator(".nav-brand .mark svg.ghost").count() === 1,
+    "la pastille de la barre latérale n'a pas le fantôme");
+  const marque = (await page.textContent(".nav-brand .mark")).trim();
+  assert(marque === "", `il reste du texte dans la pastille : « ${marque} »`);
+  await page.evaluate(() => localStorage.removeItem("mob.name"));
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert(await page.locator("#avatar svg.ghost").count() === 1,
+    "sans nom, l'avatar devrait porter le fantôme");
+});
+
 await check("la page ne renvoie nulle part vers le dépôt", async () => {
   // Demandé explicitement. À noter : ça retire le raccourci, pas la
   // lisibilité du code — une page web reste lisible par ses visiteurs.
