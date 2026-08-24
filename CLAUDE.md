@@ -197,6 +197,43 @@ Morale, à garder : **les contrôles au navigateur ne remplacent pas un
 coup d'œil aux captures.** 57 contrôles passaient au vert pendant que
 trois éléments étaient visiblement cassés.
 
+## Le relais — la seule réponse au « une clé pour tout le monde »
+
+L'utilisateur a demandé trois fois la même chose sous trois formes : une
+clé unique dans la page, Claude branché en direct, des clés créées
+automatiquement à l'inscription. Les trois butent sur le même mur : **une
+page statique ne peut pas garder un secret**. Ne réponds jamais oui à ces
+demandes, quelle que soit la formulation ; l'obfuscation (base64, chaîne
+découpée) ne compte pas, elle se défait en trente secondes.
+
+`worker/` est la réponse construite avec lui : un Worker Cloudflare qui
+détient la clé et n'expose que des **codes d'accès**. Ce qu'il faut savoir
+avant d'y toucher :
+
+- **Durable Object + SQLite, pas KV.** Le plan gratuit de KV plafonne à
+  1 000 écritures/jour, ce qui limiterait l'app à 1 000 messages par jour
+  tous utilisateurs confondus. Les Durable Objects SQLite sont gratuits à
+  100 000 écritures/jour et donnent un compteur exact. Un objet par code,
+  donc aucune contention entre personnes.
+- **Le décompte passe avant l'appel à Mistral.** Sinon un plafond atteint
+  coûterait quand même une requête.
+- **Le détail d'erreur de Mistral n'est jamais recopié au navigateur** : il
+  peut nommer la clé ou le compte. Il part dans les journaux du Worker, et
+  l'utilisateur reçoit une phrase en français.
+- **Le modèle est imposé côté serveur.** C'est ce qui rend l'onglet Admin
+  réel : un `role: "user"` ne peut pas s'offrir Mistral Large. C'est la
+  seule partie de la séparation admin qui protège vraiment quelque chose.
+- **Le CORS n'est pas une protection.** Il range les navigateurs ; qui
+  appelle en ligne de commande s'en moque. C'est le code d'accès qui tient.
+
+`RELAY_URL`, en tête du script de `docs/index.html`, est vide par défaut :
+Mob fonctionne alors exactement comme avant, chacun sa clé. Ne le remplis
+pas toi-même, c'est à l'utilisateur de le faire après son déploiement.
+
+`worker/test/relay.test.mjs` tourne sur le **vrai** moteur Cloudflare
+(`wrangler dev`) avec un faux Mistral local : ni jeton dépensé, ni secret
+nécessaire. Si tu modifies le Worker, relance-la.
+
 ## Deux réglages d'ouverture à ne pas retoucher
 
 Corrigés après une capture de l'utilisateur qui montrait une interface

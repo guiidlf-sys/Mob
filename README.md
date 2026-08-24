@@ -6,6 +6,7 @@ réellement installable. Chacune a son dossier et son guide.
 | Piste | Où | État | Ce qu'elle demande |
 |---|---|---|---|
 | **Web app** | `docs/` | ✅ prête | rien d'autre qu'un navigateur |
+| Relais (clé partagée) | `worker/` | ✅ testé | un compte Cloudflare gratuit |
 | Raccourci Siri | `shortcut/` | 📝 guide écrit | 5 min dans l'app Raccourcis |
 | App iOS native | `mobile/` | ✅ compile (CI verte) | Xcode + Mac, et 99 $/an pour la voix |
 | Cœur Python | racine | ✅ testé pour de vrai | Python 3.9+ et Ollama |
@@ -127,7 +128,7 @@ de l'app, ce sont deux emplacements séparés par le système.
 `tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
 en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
 survit-elle à un rechargement — plutôt que la présence des éléments
-dans le HTML. 70 contrôles.
+dans le HTML. 78 contrôles, plus 13 sur le relais.
 
 `.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
 sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull
@@ -168,6 +169,25 @@ Pour obtenir la clé sur [console.mistral.ai](https://console.mistral.ai)
    semble correcte.
 4. **API Keys → Create new key**, puis copier tout de suite — la valeur
    n'est affichée qu'une seule fois.
+
+### Partager Mob sans partager sa clé
+
+Par défaut, chacun colle **sa propre** clé Mistral. Pour ouvrir Mob à
+quelques proches **sans leur donner de clé** — et sans mettre la tienne
+dans la page, où elle serait publique — il y a `worker/` : un petit
+relais Cloudflare gratuit qui garde la clé côté serveur.
+
+Chaque personne reçoit alors un **code d'accès** au lieu d'une clé. Tu
+peux en révoquer un sans gêner les autres, et chacun a un plafond
+quotidien pour que personne ne vide ton quota. L'onglet Admin devient au
+passage une vraie séparation : le choix du modèle est **imposé par le
+serveur**, un utilisateur ne peut pas s'offrir Mistral Large.
+
+⚠️ C'est ta clé, donc **ton quota pour tout le monde**. C'est fait pour
+quelques personnes que tu choisis, pas pour une page ouverte à tout
+internet.
+
+Mode d'emploi complet : [`worker/README.md`](worker/README.md).
 
 ### Où va la clé
 

@@ -1,0 +1,33 @@
+{
+  // Relais Mob — garde la clé Mistral hors du navigateur.
+  // Déploiement : voir worker/README.md
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mob-relais",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-08-01",
+
+  "vars": {
+    // Origines autorisées à appeler depuis un navigateur, séparées par des
+    // virgules. Ajoute ici l'adresse de ton site.
+    "ALLOWED_ORIGINS": "https://guiidlf-sys.github.io",
+    // Modèle imposé à tout le monde sauf à l'admin.
+    "USER_MODEL": "mistral-small-latest",
+    // Plafond quotidien par défaut, quand un code n'en précise pas.
+    "DAILY_LIMIT": "100"
+  },
+
+  // Compteurs d'usage : un objet par code, donc pas de contention.
+  // SQLite est le seul moteur disponible sur le plan gratuit.
+  "durable_objects": {
+    "bindings": [{ "name": "LEDGER", "class_name": "Ledger" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Ledger"] }
+  ],
+
+  "observability": { "enabled": true }
+
+  // Les deux secrets ne sont PAS ici — ils se posent en ligne de commande :
+  //   npx wrangler secret put MISTRAL_API_KEY
+  //   npx wrangler secret put ACCESS_CODES
+}
