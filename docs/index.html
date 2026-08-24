@@ -5,18 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Mob</title>
 
-<!-- Ajouté à l'écran d'accueil, iOS lance la page en plein écran sans
-     la barre Safari, avec son propre nom sous l'icône. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mob">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#08070d">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 
 <script>
-  // Posé avant le rendu pour éviter un éclair blanc à l'ouverture en
-  // thème sombre : le script principal, lui, est en fin de page.
+  // Posé avant le rendu : sans ça, un utilisateur en thème sombre reçoit
+  // un éclair blanc à chaque ouverture, le script principal étant en fin
+  // de page.
   (function () {
     try {
       var c = JSON.parse(localStorage.getItem("mob.theme") || '"auto"');
@@ -30,114 +29,359 @@
 </script>
 
 <style>
-  /* Thème sombre — celui par défaut. Le clair est plus bas ; c'est le
-     script qui pose data-theme sur <html>, y compris quand le réglage
-     est « automatique » (il résout alors la préférence du système). */
   :root {
-    --bg: #0d0f14;
-    --surface: #171a21;
-    --surface-2: #1f232c;
-    --line: #2a2f3a;
-    --text: #e8eaed;
-    --muted: #9aa1ad;
-    --accent: #f0b429;
-    --accent-ink: #241a00;
-    --user: #2a3140;
-    --danger: #ff6b6b;
-    --radius: 16px;
+    --bg: #08070d;
+    --panel: #0e0c15;
+    --surface: #14111e;
+    --surface-2: #1c1729;
+    --line: #272038;
+    --line-soft: #1e1930;
+    --text: #f4f2f9;
+    --muted: #9990ac;
+    --accent: #a855f7;
+    --accent-2: #d8b4fe;
+    --accent-ink: #16041f;
+    --danger: #ff6b8a;
+    --ok: #3ddc84;
+    --radius: 20px;
     --fs: 16px;
+    --glow: rgba(168, 85, 247, .30);
+    --sheen: linear-gradient(150deg, rgba(255,255,255,.045), rgba(255,255,255,0) 60%);
   }
 
   :root[data-theme="light"] {
-    --bg: #e9edf3;
+    --bg: #eeeaf6;
+    --panel: #ffffff;
     --surface: #ffffff;
-    --surface-2: #dfe4ec;
-    --line: #c9d1dd;
-    --text: #14171c;
-    --muted: #55606e;
-    --accent: #9a6f08;
+    --surface-2: #f3eefb;
+    --line: #ddd4ee;
+    --line-soft: #e8e1f4;
+    --text: #17122a;
+    --muted: #5d5476;
+    --accent: #7b2cbf;
+    --accent-2: #9d4edd;
     --accent-ink: #ffffff;
-    --user: #c9d9ef;
-    --danger: #b3271b;
+    --danger: #c0244a;
+    --ok: #14804a;
+    --glow: rgba(123, 44, 191, .16);
+    --sheen: linear-gradient(150deg, rgba(123,44,191,.05), rgba(123,44,191,0) 60%);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+  /* « hidden » ne l'emporte pas sur un display explicite : sans cette
+     règle, tout élément masqué mais stylé en flex reste affiché. */
+  [hidden] { display: none !important; }
+
   html, body {
-    margin: 0;
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font: var(--fs)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font: var(--fs)/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     overscroll-behavior: none;
-    transition: background .2s, color .2s;
   }
 
-  #app {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
+  /* Halo diffus derrière l'interface, comme sur la référence. */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(58% 42% at 76% 4%, var(--glow), transparent 68%),
+      radial-gradient(46% 38% at 8% 96%, var(--glow), transparent 70%);
   }
 
-  header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--bg);
+  #app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100dvh; }
+
+  /* ============ barre latérale / navigation ============ */
+  nav {
+    display: flex; gap: 4px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line); background: var(--panel);
   }
-  header .mark {
-    width: 30px; height: 30px; border-radius: 9px;
-    background: var(--accent); color: var(--accent-ink);
-    display: grid; place-items: center;
-    font-weight: 700; font-size: 15px;
+  .nav-main, .nav-foot { display: contents; }
+  nav button {
+    flex: 1; padding: 8px 3px; border: none; background: none; cursor: pointer;
+    color: var(--muted); font: inherit; font-size: 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border-radius: 13px; min-width: 0;
   }
-  header h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-  header .spacer { flex: 1; }
+  nav button .ico { font-size: 18px; line-height: 1; }
+  nav button .lbl2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  nav button[aria-current="page"] { color: var(--accent); background: var(--surface); }
+  .nav-brand { display: none; }
+  nav .nav-sep { display: none; }
+  @media (max-width: 899px) { nav button[data-view="help"] { display: none; } }
+
+  /* ============ en-tête de page ============ */
+  header.page-head {
+    display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+    padding: max(14px, env(safe-area-inset-top)) 16px 10px;
+  }
+  .head-text { min-width: 0; flex: 1; }
+  .head-text h1 {
+    margin: 0; font-size: 22px; line-height: 1.2; font-weight: 680; letter-spacing: -.02em;
+  }
+  .head-text p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+  .head-tools { display: flex; align-items: center; gap: 8px; }
+
+  /* La pilule « Demande à Mob », reprise de la barre de recherche de la référence. */
+  .askbar {
+    display: flex; align-items: center; gap: 8px;
+    height: 42px; padding: 0 6px 0 15px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); min-width: 0;
+  }
+  .askbar input[type="text"] {
+    flex: 1; width: auto; min-width: 0; padding: 0; border-radius: 0;
+    border: none; background: none; outline: none;
+    color: var(--text); font: inherit; font-size: 14px;
+  }
+  .askbar input::placeholder { color: var(--muted); }
+  .askbar .go {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    border: none; color: var(--accent-ink); font-size: 14px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+  }
 
   .icon-btn {
-    width: 38px; height: 38px; border-radius: 11px;
+    width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
     border: 1px solid var(--line); background: var(--surface);
-    color: var(--text); font-size: 17px; cursor: pointer;
+    color: var(--text); font-size: 16px; position: relative;
     display: grid; place-items: center;
   }
-  .icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-
-  main {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 16px 16px 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .icon-btn[aria-pressed="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent;
+  }
+  .icon-btn .dot-new {
+    position: absolute; top: 8px; right: 9px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent-2); border: 2px solid var(--panel);
   }
 
-  .msg { max-width: 88%; padding: 11px 14px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
-  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 5px; }
-  .msg.bot { align-self: flex-start; background: var(--surface); border-bottom-left-radius: 5px; }
-  .msg.error { align-self: stretch; background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; }
+  /* Le bloc profil du coin haut droit de la référence. */
+  .profile {
+    display: flex; align-items: center; gap: 10px; padding: 5px 12px 5px 5px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+    cursor: pointer; font: inherit; color: var(--text); text-align: left; max-width: 230px;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); display: grid; place-items: center;
+    font-weight: 750; font-size: 14px;
+  }
+  .profile .who { min-width: 0; }
+  .profile .who b { display: block; font-size: 13px; font-weight: 620; line-height: 1.25;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile .who small { display: block; color: var(--muted); font-size: 11px; line-height: 1.25;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 699px) { .profile .who { display: none; } .profile { padding: 4px; } }
 
-  .gen { margin-top: 10px; }
-  .gen img { width: 100%; border-radius: 12px; display: block; background: var(--surface-2); }
+  /* Panneau des notifications, ouvert par la cloche. */
+  .popover {
+    position: absolute; right: 16px; top: 66px; z-index: 30; width: min(320px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+  .popover h3 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+  .popover .note-line { display: flex; gap: 10px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--line-soft); }
+  .popover .note-line:first-of-type { border-top: none; }
+  .popover .note-line span:first-child { flex-shrink: 0; }
+  .popover .note-line small { display: block; color: var(--muted); font-size: 11.5px; }
+
+  /* ============ onglets segmentés ============ */
+  .tabs {
+    display: flex; gap: 4px; margin: 2px 16px 12px; padding: 4px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 1; white-space: nowrap; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    border: none; background: none; color: var(--muted); font: inherit; font-size: 13.5px;
+  }
+  .tabs button[aria-selected="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); font-weight: 620;
+  }
+
+  /* ============ corps ============ */
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+  .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .view.active { display: flex; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 16px 16px; }
+
+  /* ============ cartes ============ */
+  .card, .panel {
+    background: var(--surface); background-image: var(--sheen);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 14px;
+  }
+  .card > h2, .panel > h2 { margin: 0 0 3px; font-size: 15.5px; font-weight: 650; }
+  .card > p.sub, .panel > p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 650; flex: 1; min-width: 0; }
+
+  /* ---- tableau de bord ---- */
+  .dash { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+  .dash-col { min-width: 0; }
+
+  /* Grande carte chiffrée, équivalent du « Total Holding ». */
+  .hero {
+    background: var(--surface); background-image: var(--sheen);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 14px;
+  }
+  .hero .top { display: flex; align-items: center; gap: 10px; }
+  .hero .top .k { flex: 1; color: var(--muted); font-size: 13px; }
+  .hero .big { font-size: 38px; font-weight: 700; letter-spacing: -.03em; margin: 8px 0 2px; line-height: 1.05; }
+  .hero .sub2 { color: var(--muted); font-size: 13px; }
+  .delta { font-size: 12.5px; font-weight: 620; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .delta.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
+  .delta.down { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+  .delta.flat { color: var(--muted); background: var(--surface-2); }
+  select.mini {
+    width: auto; max-width: 60%; height: 32px; padding: 0 10px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    font: inherit; font-size: 12.5px;
+  }
+
+  /* Carte promotionnelle en dégradé, équivalent du « Decisions Powered by Data ». */
+  .promo {
+    border-radius: var(--radius); padding: 22px; margin-bottom: 14px; position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 55%, #2e1065 100%);
+    color: #fff;
+  }
+  .promo::after {
+    content: ""; position: absolute; right: -60px; top: -70px; width: 220px; height: 220px;
+    border-radius: 50%; background: rgba(255,255,255,.13);
+  }
+  .promo h3 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.02em; max-width: 20ch; position: relative; }
+  .promo p { margin: 8px 0 16px; font-size: 13.5px; opacity: .88; max-width: 34ch; position: relative; }
+  .promo button {
+    position: relative; padding: 11px 20px; border-radius: 999px; cursor: pointer;
+    border: none; background: #fff; color: #2e1065; font: inherit; font-size: 13.5px; font-weight: 650;
+  }
+
+  /* Graphique + pilules de période, équivalent du panneau de cours. */
+  .chart-wrap { position: relative; }
+  #chartHost { position: relative; }
+  .ranges { display: flex; gap: 4px; }
+  .ranges button {
+    padding: 6px 11px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+    background: var(--surface-2); color: var(--muted); font: inherit; font-size: 12px;
+  }
+  .ranges button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 620; }
+  .chart-wrap svg { width: 100%; height: 168px; display: block; overflow: visible; }
+  .chart-x { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 6px; }
+  .tip {
+    position: absolute; pointer-events: none; transform: translate(-50%, -120%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    padding: 7px 11px; font-size: 12px; white-space: nowrap; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  .tip b { display: block; font-size: 14px; }
+  .tip small { color: var(--muted); }
+  .chart-empty { color: var(--muted); font-size: 13px; padding: 26px 0; text-align: center; }
+
+  /* Liste à variations, équivalent de la « Watchlist ». */
+  .list-row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .list-row:first-of-type { border-top: none; }
+  .list-row .ic {
+    width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center;
+    background: var(--surface-2); font-size: 17px;
+  }
+  .list-row .nm { flex: 1; min-width: 0; }
+  .list-row .nm b { display: block; font-size: 14px; font-weight: 600; }
+  .list-row .nm small { display: block; color: var(--muted); font-size: 11.5px; }
+  .list-row .vl { text-align: right; }
+  .list-row .vl b { display: block; font-size: 14.5px; font-weight: 650; }
+
+  /* Tuiles 2×2, équivalent du « My Portfolio ». */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric { padding: 14px; border-radius: 15px; background: var(--surface-2); border: 1px solid var(--line); }
+  .metric .ic { font-size: 17px; }
+  .metric b { display: block; font-size: 19px; font-weight: 700; margin-top: 6px; letter-spacing: -.02em; }
+  .metric small { color: var(--muted); font-size: 11.5px; }
+
+  /* Actions rapides de l'onglet « Outils ». */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .quick button {
+    text-align: left; padding: 15px; border-radius: 15px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit;
+  }
+  .quick button .ic { font-size: 20px; }
+  .quick button b { display: block; font-size: 14px; font-weight: 620; margin-top: 7px; }
+  .quick button small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
+  /* Bandeau de la conversation : son titre et le bouton « nouvelle ». */
+  .chat-bar { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; }
+  .chat-bar b {
+    flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chat-bar button {
+    flex-shrink: 0; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    font: inherit; font-size: 12.5px;
+  }
+
+  /* Journal des discussions. */
+  .hist-row {
+    display: flex; align-items: center; gap: 10px; padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .hist-row:first-of-type { border-top: none; }
+  .hist-open {
+    flex: 1; min-width: 0; text-align: left; cursor: pointer;
+    background: none; border: none; padding: 0; color: var(--text); font: inherit;
+  }
+  .hist-open b { display: block; font-size: 14px; font-weight: 600;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-open small { display: block; color: var(--muted); font-size: 11.5px; }
+  .hist-row.current .hist-open b { color: var(--accent); }
+  .hist-del {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 14px;
+  }
+
+  /* ============ conversation ============ */
+  #messages { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+  .msg { max-width: 88%; padding: 12px 15px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user {
+    align-self: flex-end; border-bottom-right-radius: 6px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
+  }
+  .msg.bot { align-self: flex-start; border-bottom-left-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+  .msg.error {
+    align-self: stretch; background: transparent;
+    border: 1px solid var(--danger); color: var(--danger); font-size: 14px;
+  }
+  .older { align-self: center; font-size: 12px; color: var(--muted); padding: 5px 13px; border-radius: 999px; background: var(--surface-2); }
+
+  .gen { margin-top: 11px; }
+  .gen img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; display: block; background: var(--surface-2); }
   .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
-  .gen-fail { margin-top: 10px; font-size: 13px; color: var(--danger); }
-
+  .gen-fail { margin-top: 11px; font-size: 13px; color: var(--danger); }
   .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .gen-actions button {
-    padding: 9px 13px; border-radius: 10px; font: inherit; font-size: 14px;
-    border: 1px solid var(--accent); background: transparent;
-    color: var(--accent); cursor: pointer;
+    padding: 9px 13px; border-radius: 11px; font: inherit; font-size: 13.5px;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer;
   }
 
-  .older {
-    align-self: center; font-size: 12px; color: var(--muted);
-    padding: 4px 12px; border-radius: 999px; background: var(--surface-2);
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 30px 20px; }
+  .empty .big {
+    width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 21px;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); display: grid; place-items: center;
+    font-size: 27px; font-weight: 800; box-shadow: 0 10px 34px var(--glow);
   }
-
-  .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
-  .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 17px; }
+  .empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 18px; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+  .suggest button {
+    padding: 9px 14px; border-radius: 999px; font: inherit; font-size: 13.5px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
+  }
 
   .thinking { align-self: flex-start; color: var(--muted); font-size: 14px; padding: 4px 2px; }
   .thinking span { animation: blink 1.2s infinite; }
@@ -145,268 +389,1200 @@
   .thinking span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%,60%,100% { opacity: .25 } 30% { opacity: 1 } }
 
-  #composer {
-    display: flex; align-items: flex-end; gap: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--bg);
-  }
+  #composer { display: flex; align-items: flex-end; gap: 9px; padding: 10px 16px 12px; }
   #input {
-    flex: 1; resize: none; max-height: 140px;
-    padding: 11px 14px; border-radius: 20px;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--text); font: inherit; line-height: 1.4;
+    flex: 1; resize: none; max-height: 140px; padding: 12px 16px; border-radius: 22px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; line-height: 1.4;
   }
   #input:focus { outline: none; border-color: var(--accent); }
-
-  .send { width: 42px; height: 42px; border-radius: 50%; border: none;
-          background: var(--accent); color: var(--accent-ink); font-size: 18px;
-          cursor: pointer; flex-shrink: 0; }
-  .send:disabled { opacity: .4; }
-  .mic { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-         border: 1px solid var(--line); background: var(--surface-2);
-         color: var(--text); font-size: 18px; cursor: pointer; }
-  .mic.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
-  @keyframes pulse { 50% { transform: scale(1.08) } }
-
-  dialog {
-    border: none; border-radius: 20px; padding: 0; width: min(440px, 92vw);
-    max-height: 90dvh; background: var(--surface); color: var(--text);
+  .round {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 18px; cursor: pointer;
   }
-  dialog::backdrop { background: rgba(0,0,0,.6); }
-  .sheet { padding: 20px; }
-  .sheet h2 { margin: 0 0 4px; font-size: 19px; }
-  .sheet p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
-  input[type=password], input[type=text], select {
-    width: 100%; padding: 11px 13px; border-radius: 11px;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--text); font: inherit;
+  .round.primary {
+    border: none; color: var(--accent-ink);
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    box-shadow: 0 6px 20px var(--glow);
   }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
-  .row span { font-size: 14.5px; }
-  .btns { display: flex; gap: 10px; margin-top: 22px; }
-  button.primary { flex: 1; padding: 12px; border-radius: 12px; border: none;
-                   background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
-  button.ghost { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
-                 background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
-  .note { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .note a { color: var(--accent); }
+  .round.primary:disabled { opacity: .45; box-shadow: none; }
+  .round.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.3s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.09) } }
 
-  /* Interrupteur */
-  .switch { position: relative; width: 48px; height: 29px; flex-shrink: 0; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; inset: 0; background: var(--surface-2);
-            border: 1px solid var(--line); border-radius: 29px; transition: .2s; cursor: pointer; }
-  .slider:before { content: ""; position: absolute; width: 23px; height: 23px; left: 2px; top: 2px;
-                   background: var(--muted); border-radius: 50%; transition: .2s; }
-  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
-  .switch input:checked + .slider:before { transform: translateX(19px); background: var(--accent-ink); }
-
-  /* --- Réglages --- */
-  .sheet { max-height: 82dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-
-  .section { margin-top: 26px; }
-  .section:first-of-type { margin-top: 12px; }
-  .section > h3 {
-    margin: 0 0 2px; font-size: 12px; font-weight: 650;
-    text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  /* ============ formulaires ============ */
+  .field { margin-top: 15px; }
+  .field > label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; }
+  input[type=password], input[type=text], select, textarea.box {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit;
   }
-  .section > .hint { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
-  .section .row:first-of-type { margin-top: 10px; }
+  textarea.box { min-height: 108px; resize: vertical; line-height: 1.5; font-size: 14px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
 
-  /* Contrôle segmenté (thème, taille du texte) */
-  .seg { display: flex; gap: 6px; margin-top: 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; }
+  .row .lbl { font-size: 14.5px; }
+  .row .lbl small { display: block; color: var(--muted); font-size: 12px; }
+  .chip {
+    height: 38px; min-width: 38px; padding: 0 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent;
+  }
+  .badge-admin {
+    display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-radius: 999px; padding: 3px 9px; vertical-align: middle; margin-left: 8px;
+  }
+
+  .seg { display: flex; gap: 6px; }
   .seg button {
-    flex: 1; padding: 10px 6px; border-radius: 10px; cursor: pointer;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--muted); font: inherit; font-size: 14px;
+    flex: 1; padding: 10px 5px; border-radius: 11px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font: inherit; font-size: 13.5px;
   }
   .seg button[aria-pressed="true"] {
-    background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink); border-color: transparent; font-weight: 650;
   }
 
   .state {
-    display: flex; align-items: center; gap: 9px;
-    padding: 12px 14px; border-radius: 12px;
-    background: var(--surface-2); border: 1px solid var(--line);
-    font-size: 14px; margin-top: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 13px 15px;
+    border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); font-size: 14px;
   }
   .state .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--danger); }
-  .state.on .dot { background: #35c759; }
-  .state .who { flex: 1; }
-  .state .who small { display: block; color: var(--muted); font-size: 12px; }
+  .state.on .dot { background: var(--ok); box-shadow: 0 0 9px var(--ok); }
+  .state .who2 { flex: 1; min-width: 0; }
+  .state .who2 small { display: block; color: var(--muted); font-size: 12px; }
 
-  .link-btn {
-    background: none; border: none; padding: 0; cursor: pointer;
-    color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline;
+  .link-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--accent); font: inherit; font-size: 13.5px; text-decoration: underline; }
+  .btn {
+    width: 100%; padding: 12px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 14.5px;
+    border: none; color: var(--accent-ink); font-weight: 650;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
   }
-  .danger-btn {
-    width: 100%; margin-top: 10px; padding: 11px; border-radius: 11px; cursor: pointer;
-    border: 1px solid var(--danger); background: transparent;
-    color: var(--danger); font: inherit; font-size: 14px;
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
+  .btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); font-weight: 400; }
+  .btn + .btn { margin-top: 9px; }
+  .range { width: 100%; accent-color: var(--accent); }
+  .range-val { color: var(--muted); }
+  .note { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+  .note a { color: var(--accent); }
+  .warn {
+    margin-top: 13px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.55;
+    border: 1px solid var(--danger); color: var(--danger); background: transparent;
   }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { padding: 13px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); }
+  .stat b { display: block; font-size: 19px; font-weight: 700; }
+  .stat small { color: var(--muted); font-size: 11.5px; }
 
-  .range { width: 100%; accent-color: var(--accent); margin-top: 10px; }
-  .range-val { font-size: 13px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .tile { border-radius: 15px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+  .tile img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+  .tile .lab { padding: 8px 10px; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .steps { margin: 0; padding-left: 20px; font-size: 14px; }
+  .steps li { margin-bottom: 9px; }
+
+  /* ============ grand écran : la barre latérale de la référence ============ */
+  @media (min-width: 900px) {
+    #app { flex-direction: row; padding: 16px; gap: 16px; }
+    nav {
+      order: -1; flex-direction: column; width: 236px; flex-shrink: 0; gap: 4px;
+      border: 1px solid var(--line); border-radius: 24px; padding: 18px 12px;
+      background: var(--panel);
+    }
+    .nav-main { display: flex; flex-direction: column; gap: 4px; }
+    .nav-foot { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+    nav .nav-sep { display: block; height: 1px; background: var(--line); margin: 14px 6px 12px; }
+    nav button {
+      flex: none; flex-direction: row; justify-content: flex-start; gap: 12px;
+      padding: 11px 14px; font-size: 14px;
+    }
+    nav button .ico { font-size: 17px; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 20px; }
+    .nav-brand .mark {
+      width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+      background: linear-gradient(140deg, var(--accent-2), var(--accent));
+      color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: 16px;
+      box-shadow: 0 6px 20px var(--glow);
+    }
+    .nav-brand b { display: block; font-size: 16px; font-weight: 680; letter-spacing: -.01em; }
+    .nav-brand small { display: block; color: var(--muted); font-size: 11px; }
+    main {
+      flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px;
+      background: var(--panel); overflow: hidden; flex-direction: column;
+    }
+    .chat-bar { padding: 0 24px 8px; }
+    header.page-head { padding: 20px 24px 12px; flex-wrap: nowrap; align-items: center; }
+    .head-text h1 { font-size: 26px; }
+    .askbar { width: 250px; }
+    .tabs { margin: 2px 24px 14px; flex: none; align-self: flex-start; }
+    .tabs button { flex: none; }
+    .scroll { padding: 2px 24px 20px; }
+    #composer { padding: 12px 24px 18px; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .popover { right: 24px; top: 74px; }
+  }
+  @media (min-width: 1180px) {
+    .dash { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
 
 <div id="app">
-  <header>
-    <div class="mark">M</div>
-    <h1>Mob</h1>
-    <div class="spacer"></div>
-    <button class="icon-btn" id="voiceToggle" aria-pressed="false" title="Lecture à voix haute">🔊</button>
-    <button class="icon-btn" id="openSettings" title="Réglages">⚙</button>
-  </header>
+  <main>
 
-  <main id="messages"></main>
-
-  <div id="composer">
-    <button class="mic" id="mic" title="Dicter">🎙</button>
-    <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
-    <button class="send" id="send" title="Envoyer">↑</button>
-  </div>
-</div>
-
-<dialog id="settings">
-  <form method="dialog" class="sheet" id="settingsForm">
-    <h2>Réglages</h2>
-    <p class="sub">Tout reste sur cet appareil.</p>
-
-    <!-- Compte -->
-    <div class="section">
-      <h3>Compte</h3>
-      <div class="state" id="accountState">
-        <span class="dot"></span>
-        <span class="who" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
-        <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+    <!-- ====== en-tête : salutation, recherche, icônes, profil ====== -->
+    <header class="page-head">
+      <div class="head-text">
+        <h1 id="headTitle"><span id="headTitleText">Bonjour</span><span class="badge-admin" id="adminBadge" hidden>Admin</span></h1>
+        <p id="headSub">Voici ce que Mob a fait pour toi.</p>
       </div>
+      <div class="head-tools">
+        <div class="askbar">
+          <input id="ask" type="text" placeholder="Demande à Mob…" autocomplete="off" spellcheck="false"
+                 aria-label="Demander quelque chose à Mob">
+          <button class="go" id="askMic" type="button" title="Dicter" aria-label="Dicter">🎙</button>
+        </div>
+        <button class="icon-btn" id="bell" type="button" aria-pressed="false" aria-label="Notifications">🔔<span class="dot-new" id="bellDot" hidden></span></button>
+        <button class="icon-btn" id="voiceToggle" type="button" aria-pressed="false" aria-label="Lecture à voix haute">🔈</button>
+        <button class="profile" id="profileBtn" type="button" aria-label="Ouvrir les réglages">
+          <span class="avatar" id="avatar">?</span>
+          <span class="who"><b id="profileName">Invité</b><small id="profileRole">Non connecté</small></span>
+        </button>
+      </div>
+    </header>
 
-      <div id="keyFields">
-        <label for="key">Clé d'API Mistral</label>
-        <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
-        <p class="hint" style="margin-top:8px">
-          Elle n'est demandée qu'une fois : elle reste dans ce navigateur et
-          te reconnecte automatiquement ensuite. Crée-la sur
-          <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+    <div class="popover" id="notifs" hidden>
+      <h3>Notifications</h3>
+      <div id="notifBody"></div>
+    </div>
+
+    <!-- ====== Tableau de bord ====== -->
+    <section class="view" id="view-home">
+      <div class="tabs" id="homeTabs" role="tablist">
+        <button type="button" role="tab" data-tab="apercu" aria-selected="true">Aperçu</button>
+        <button type="button" role="tab" data-tab="activite" aria-selected="false">Activité</button>
+        <button type="button" role="tab" data-tab="outils" aria-selected="false">Outils</button>
+      </div>
+      <div class="scroll">
+        <div class="dash">
+          <div class="dash-col">
+
+            <div class="hero" id="tab-apercu-hero">
+              <div class="top">
+                <span class="k">Total des échanges</span>
+                <select class="mini" id="period" aria-label="Période">
+                  <option value="7">7 derniers jours</option>
+                  <option value="30" selected>30 derniers jours</option>
+                  <option value="90">90 derniers jours</option>
+                  <option value="365">12 derniers mois</option>
+                </select>
+              </div>
+              <div class="big" id="heroValue">0</div>
+              <div class="sub2">
+                <span class="delta flat" id="heroDelta">—</span>
+                <span id="heroNote">sur 0 message conservé</span>
+              </div>
+            </div>
+
+            <div class="promo" data-section="apercu">
+              <h3>Tes idées, guidées par tes données.</h3>
+              <p>Pose une question, demande une image, fais écrire une page — tout reste sur cet appareil.</p>
+              <button type="button" id="promoCta">Commencer maintenant</button>
+            </div>
+
+            <div class="panel chart-wrap" data-section="apercu activite">
+              <div class="panel-head">
+                <h2>Activité</h2>
+                <div class="ranges" id="ranges" role="group" aria-label="Période du graphique">
+                  <button type="button" data-range="1J" aria-pressed="false">1J</button>
+                  <button type="button" data-range="1S" aria-pressed="false">1S</button>
+                  <button type="button" data-range="1M" aria-pressed="true">1M</button>
+                  <button type="button" data-range="6M" aria-pressed="false">6M</button>
+                  <button type="button" data-range="1A" aria-pressed="false">1A</button>
+                </div>
+              </div>
+              <div id="chartHost"></div>
+            </div>
+
+            <div class="panel" data-section="outils">
+              <h2>Actions rapides</h2>
+              <p class="sub">Chaque bouton lance directement une demande à Mob.</p>
+              <div class="quick" id="quick"></div>
+            </div>
+
+          </div>
+          <div class="dash-col">
+
+            <div class="panel" data-section="apercu activite">
+              <div class="panel-head">
+                <h2>Ton activité</h2>
+                <span class="delta flat" id="watchPeriod">30 j</span>
+              </div>
+              <div id="watchlist"></div>
+            </div>
+
+            <div class="panel" data-section="apercu outils">
+              <h2>Ton espace</h2>
+              <p class="sub">L'état de Mob sur cet appareil.</p>
+              <div class="metrics" id="metrics"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Conversation ====== -->
+    <section class="view" id="view-chat">
+      <div class="chat-bar">
+        <b id="chatTitle">Nouvelle discussion</b>
+        <button type="button" id="newChat">＋ Nouvelle</button>
+      </div>
+      <div class="scroll"><div id="messages"></div></div>
+      <div id="composer">
+        <button class="round" id="mic" type="button" title="Dicter">🎙</button>
+        <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
+        <button class="round primary" id="send" type="button" title="Envoyer">↑</button>
+      </div>
+    </section>
+
+    <!-- ====== Historique ====== -->
+    <section class="view" id="view-historique">
+      <div class="scroll">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Tes discussions</h2>
+            <button type="button" class="chip" id="newChat2">＋ Nouvelle</button>
+          </div>
+          <p class="sub">Chaque visite ouvre une discussion neuve ; les précédentes t'attendent ici.</p>
+          <div id="histList"></div>
+        </div>
+        <div class="card">
+          <h2>Tout effacer</h2>
+          <p class="sub">Supprime toutes les discussions de cet appareil. Irréversible.</p>
+          <button type="button" class="btn danger" id="clearAll">Effacer tout l'historique</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Créations ====== -->
+    <section class="view" id="view-creations">
+      <div class="scroll">
+        <div class="card">
+          <h2>Tes créations</h2>
+          <p class="sub">Les images et les pages produites au fil des conversations.</p>
+          <div id="creations"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Réglages ====== -->
+    <section class="view" id="view-settings">
+      <div class="scroll">
+        <div class="card">
+          <h2>Compte</h2>
+          <p class="sub">Ta clé sert d'identifiant et reste sur cet appareil.</p>
+          <div class="state" id="accountState">
+            <span class="dot"></span>
+            <span class="who2" id="accountWho">Non connecté<small>Ajoute ta clé pour commencer</small></span>
+            <button type="button" class="link-btn" id="editKey" hidden>Modifier</button>
+          </div>
+          <div class="field">
+            <label for="displayName">Nom affiché</label>
+            <input type="text" id="displayName" placeholder="Ton prénom" autocomplete="off">
+          </div>
+          <div id="keyFields">
+            <div class="field">
+              <label for="key">Clé d'API Mistral</label>
+              <input type="password" id="key" placeholder="colle ta clé ici" autocomplete="off" spellcheck="false">
+            </div>
+            <p class="note">
+              Demandée une seule fois : elle reste dans ce navigateur et te
+              reconnecte ensuite. À créer sur
+              <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>.
+            </p>
+          </div>
+          <button type="button" class="btn danger" id="signOut" hidden style="margin-top:12px">Se déconnecter</button>
+        </div>
+
+        <div class="card">
+          <h2>Apparence</h2>
+          <p class="sub">Le thème suit ton iPhone si tu laisses « Auto ».</p>
+          <div class="field">
+            <label>Thème</label>
+            <div class="seg" id="themeSeg" role="group" aria-label="Thème">
+              <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
+              <button type="button" data-theme-choice="dark" aria-pressed="false">Sombre</button>
+              <button type="button" data-theme-choice="light" aria-pressed="false">Clair</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Taille du texte</label>
+            <div class="seg" id="sizeSeg" role="group" aria-label="Taille du texte">
+              <button type="button" data-size="15" aria-pressed="false">Petit</button>
+              <button type="button" data-size="16" aria-pressed="false">Normal</button>
+              <button type="button" data-size="18" aria-pressed="false">Grand</button>
+              <button type="button" data-size="21" aria-pressed="false">Très grand</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Voix</h2>
+          <div class="row">
+            <span class="lbl">Lire les réponses à voix haute</span>
+            <button class="chip" id="speakPref" type="button" aria-pressed="false">Non</button>
+          </div>
+          <div class="field">
+            <label for="rate">Vitesse de lecture — <span class="range-val" id="rateVal">normale</span></label>
+            <input type="range" class="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Données</h2>
+          <p class="sub">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
+          <button type="button" class="btn danger" id="clearHistory">Effacer la discussion en cours</button>
+        </div>
+
+        <div class="card">
+          <h2>Espace administrateur</h2>
+          <p class="sub" id="adminSub">Réservé au propriétaire de l'instance.</p>
+          <div class="field" id="adminUnlock">
+            <label for="adminCode">Code d'accès</label>
+            <input type="password" id="adminCode" placeholder="code" autocomplete="off">
+            <button type="button" class="btn ghost" id="adminEnter" style="margin-top:10px">Ouvrir l'espace admin</button>
+          </div>
+          <button type="button" class="btn ghost" id="adminLeave" hidden>Quitter le mode admin</button>
+          <div class="warn">
+            Ce code range l'interface, il ne la protège pas. Mob est une page
+            web : son code est lisible par quiconque, donc rien de ce qui est
+            caché ici n'est réellement inaccessible. Une vraie séparation de
+            droits demanderait un serveur.
+          </div>
+        </div>
+
+        <p class="note" style="text-align:center">
+          Mob · <a href="https://github.com/guiidlf-sys/Mob" target="_blank" rel="noopener">code source</a>
         </p>
       </div>
+    </section>
 
-      <button type="button" class="danger-btn" id="signOut" hidden>Se déconnecter</button>
-    </div>
-
-    <!-- Apparence -->
-    <div class="section">
-      <h3>Apparence</h3>
-
-      <label>Thème</label>
-      <div class="seg" id="themeSeg" role="group" aria-label="Thème">
-        <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
-        <button type="button" data-theme-choice="dark" aria-pressed="false">Sombre</button>
-        <button type="button" data-theme-choice="light" aria-pressed="false">Clair</button>
+    <!-- ====== Aide ====== -->
+    <section class="view" id="view-help">
+      <div class="scroll">
+        <div class="card">
+          <h2>Premiers pas</h2>
+          <p class="sub">Trois minutes, une seule fois.</p>
+          <ol class="steps">
+            <li>Crée une clé sur <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a> — pense à choisir le plan gratuit « Experiment » dans Billing, sinon la clé est refusée.</li>
+            <li>Colle-la dans <b>Réglages → Compte</b>. Elle n'est demandée qu'une fois.</li>
+            <li>Sur iPhone : <b>Partager → Sur l'écran d'accueil</b> pour lancer Mob en plein écran.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h2>Déclenchement vocal</h2>
+          <p class="sub">« Dis Siri, Mob »</p>
+          <p class="note" style="margin-top:0">
+            Un raccourci iOS de trois actions dicte ta question et ouvre Mob
+            avec elle déjà posée. C'est le seul chemin vocal gratuit : le
+            déclenchement natif d'une app demande l'autorisation Siri,
+            réservée au compte développeur payant. Le mode d'emploi est dans
+            <a href="https://github.com/guiidlf-sys/Mob/blob/main/shortcut/README.md" target="_blank" rel="noopener">shortcut/README.md</a>.
+          </p>
+        </div>
+        <div class="card">
+          <h2>Où vont tes données</h2>
+          <p class="note" style="margin-top:0">
+            La clé, la conversation et les réglages vivent dans le stockage
+            local de ce navigateur, sur cet appareil uniquement. Seules tes
+            questions partent chez Mistral. Attention : sur iOS, l'app ajoutée
+            à l'écran d'accueil a un stockage <b>distinct</b> de Safari — il
+            faut saisir la clé une fois dans chacun.
+          </p>
+        </div>
       </div>
-      <p class="hint" style="margin-top:8px">« Auto » suit le réglage de ton iPhone.</p>
+    </section>
 
-      <label>Taille du texte</label>
-      <div class="seg" id="sizeSeg" role="group" aria-label="Taille du texte">
-        <button type="button" data-size="15" aria-pressed="false">Petit</button>
-        <button type="button" data-size="16" aria-pressed="false">Normal</button>
-        <button type="button" data-size="18" aria-pressed="false">Grand</button>
-        <button type="button" data-size="21" aria-pressed="false">Très grand</button>
+    <!-- ====== Admin ====== -->
+    <section class="view" id="view-admin">
+      <div class="scroll">
+        <div class="card">
+          <h2>État</h2>
+          <p class="sub">Ce que cette instance contient en ce moment.</p>
+          <div class="stats">
+            <div class="stat"><b id="statMsgs">0</b><small>messages gardés</small></div>
+            <div class="stat"><b id="statImgs">0</b><small>images générées</small></div>
+            <div class="stat"><b id="statSites">0</b><small>pages générées</small></div>
+            <div class="stat"><b id="statSize">0 o</b><small>stockage utilisé</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Modèle</h2>
+          <p class="sub">Choix réservé à l'admin : il change le coût et la qualité.</p>
+          <div class="field">
+            <label for="model">Modèle utilisé</label>
+            <select id="model">
+              <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
+              <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
+              <option value="mistral-large-latest">Mistral Large — le plus capable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ctx">Mémoire relue — <span class="range-val" id="ctxVal">24 messages</span></label>
+            <input type="range" class="range" id="ctx" min="4" max="60" step="2" value="24">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Personnalité</h2>
+          <p class="sub">Les instructions que Mob reçoit avant chaque question.</p>
+          <textarea class="box" id="sysPrompt" spellcheck="false"></textarea>
+          <button type="button" class="btn ghost" id="resetPrompt" style="margin-top:10px">Rétablir le texte d'origine</button>
+          <p class="note">
+            Les repères <code>IMAGE(...)</code> et le bloc <code>```html</code> sont
+            ce qui déclenche les images et les pages : les retirer désactive ces
+            deux capacités.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Zone sensible</h2>
+          <button type="button" class="btn danger" id="wipeAll">Tout effacer sur cet appareil</button>
+          <p class="note">Clé, conversation et réglages. Irréversible.</p>
+        </div>
       </div>
+    </section>
+  </main>
+
+  <nav id="nav">
+    <div class="nav-brand">
+      <div class="mark">M</div>
+      <div><b>Mob</b><small id="navSub">Assistant</small></div>
     </div>
-
-    <!-- Voix -->
-    <div class="section">
-      <h3>Voix</h3>
-      <div class="row">
-        <span>Lire les réponses à voix haute</span>
-        <label class="switch"><input type="checkbox" id="speakPref"><span class="slider"></span></label>
-      </div>
-
-      <label for="rate">Vitesse de lecture — <span class="range-val" id="rateVal">normale</span></label>
-      <input type="range" class="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+    <div class="nav-main">
+      <button type="button" data-view="home" aria-current="page"><span class="ico">🏠</span><span class="lbl2">Accueil</span></button>
+      <button type="button" data-view="chat"><span class="ico">💬</span><span class="lbl2">Chat</span></button>
+      <button type="button" data-view="historique"><span class="ico">🕘</span><span class="lbl2">Historique</span></button>
+      <button type="button" data-view="creations"><span class="ico">🎨</span><span class="lbl2">Créations</span></button>
+      <button type="button" data-view="admin" id="navAdmin" hidden><span class="ico">🛡️</span><span class="lbl2">Admin</span></button>
     </div>
-
-    <!-- Conversation -->
-    <div class="section">
-      <h3>Conversation</h3>
-
-      <label for="model">Modèle</label>
-      <select id="model">
-        <option value="mistral-small-latest">Mistral Small — rapide (recommandé)</option>
-        <option value="mistral-medium-latest">Mistral Medium — plus capable</option>
-        <option value="mistral-large-latest">Mistral Large — le plus capable</option>
-      </select>
-
-      <label for="ctx">Mémoire envoyée — <span class="range-val" id="ctxVal">24 messages</span></label>
-      <input type="range" class="range" id="ctx" min="4" max="60" step="2" value="24">
-      <p class="hint" style="margin-top:8px">
-        Combien d'échanges passés Mob relit à chaque question. Plus haut, il
-        suit mieux le fil ; plus bas, il répond plus vite. Ton historique
-        complet est gardé quoi qu'il arrive.
-      </p>
+    <div class="nav-sep"></div>
+    <div class="nav-foot">
+      <button type="button" data-view="settings"><span class="ico">⚙️</span><span class="lbl2">Réglages</span></button>
+      <button type="button" data-view="help"><span class="ico">❔</span><span class="lbl2">Aide</span></button>
     </div>
-
-    <!-- Données -->
-    <div class="section">
-      <h3>Données</h3>
-      <p class="hint">Rien ne quitte cet appareil, sauf tes questions envoyées à Mistral.</p>
-      <button type="button" class="danger-btn" id="clearHistory">Effacer la conversation</button>
-    </div>
-
-    <div class="btns">
-      <button type="button" class="ghost" id="closeSettings">Fermer</button>
-      <button type="submit" class="primary">Enregistrer</button>
-    </div>
-
-    <p class="note">
-      Mob · <a href="https://github.com/guiidlf-sys/Mob" target="_blank" rel="noopener">code source</a>
-    </p>
-  </form>
-</dialog>
+  </nav>
+</div>
 
 <script>
 (function () {
   "use strict";
 
   var API = "https://api.mistral.ai/v1/chat/completions";
-
-  // Fenêtre de contexte envoyée au modèle — réglable. L'historique complet
-  // reste sur l'appareil ; seule cette tranche part à chaque tour, parce
-  // que la limite du modèle et la place sur le disque sont deux choses
-  // différentes.
-  function contextWindow() { return store.get("mob.ctx", 24); }
-
-  // Nombre de bulles réellement dessinées. Sans plafond, une longue
-  // conversation ralentit chaque envoi.
+  var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
   var DRAWN_MESSAGES = 60;
 
-  var SYSTEM = "Tu es Mob, l'assistant personnel de l'utilisateur. " +
-    "Réponds en français, de façon directe et utile. Sois bref quand la " +
-    "question est simple ; développe autant qu'il le faut quand c'est " +
-    "justifié — code, raisonnement technique, explication de fond. " +
-    "Évite les formules de politesse creuses et les listes à puces quand " +
-    "une phrase suffit.\n\n" +
+  var DEFAULT_PROMPT =
+    "Tu es Mob, l'assistant personnel de l'utilisateur. Réponds en français, " +
+    "de façon directe et utile. Sois bref quand la question est simple ; " +
+    "développe autant qu'il le faut quand c'est justifié — code, raisonnement " +
+    "technique, explication de fond. Évite les formules de politesse creuses.\n\n" +
     "Deux capacités particulières :\n" +
     "1. IMAGE — si on te demande de générer, dessiner ou créer une image, " +
     "réponds par une courte phrase puis, sur une ligne seule, " +
-    "IMAGE(description détaillée en anglais). La description anglaise est " +
-    "envoyée telle quelle au générateur : sois précis et visuel.\n" +
-    "2. SITE WEB — si on te demande un site, une page ou une interface, " +
-    "donne un document HTML complet et autonome dans un bloc ```html, " +
-    "styles et scripts compris. Pas de fichiers séparés, pas de " +
-    "dépendances externes : une seule page qui s'ouvre telle quelle.";
+    "IMAGE(description détaillée en anglais). La description anglaise part " +
+    "telle quelle au générateur : sois précis et visuel.\n" +
+    "2. SITE WEB — si on te demande un site, une page ou une interface, donne " +
+    "un document HTML complet et autonome dans un bloc ```html, styles et " +
+    "scripts compris. Pas de fichiers séparés, pas de dépendances externes.";
 
-  // Génération d'images sans clé ni compte (Pollinations) : l'image est
-  // une simple URL, donc un <img> suffit — aucun appel à authentifier.
-  var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
+  var store = {
+    get: function (k, fallback) {
+      try {
+        var v = localStorage.getItem(k);
+        return v === null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set: function (k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé */ }
+    }
+  };
+
+  function saveChats() { store.set("mob.chats", chats); }
+
+  function allMessages() {
+    var out = [];
+    for (var i = 0; i < chats.length; i++) out = out.concat(chats[i].messages);
+    if (chats.indexOf(current) === -1) out = out.concat(current.messages);
+    return out;
+  }
+
+  function contextWindow() { return store.get("mob.ctx", 24); }
+  function systemPrompt() { return store.get("mob.prompt", DEFAULT_PROMPT); }
+  function isAdmin() { return store.get("mob.admin", false); }
+  function adminCode() { return store.get("mob.adminCode", "mob"); }
+  function displayName() { return (store.get("mob.name", "") || "").trim(); }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function titleOf(text) {
+    var t = String(text || "").replace(/\s+/g, " ").trim();
+    return t.length > 44 ? t.slice(0, 44) + "…" : (t || "Discussion");
+  }
+
+  function blankChat() {
+    return { id: uid(), title: "", created: Date.now(), updated: Date.now(), messages: [] };
+  }
+
+  // Le journal est la source de vérité ; « history » reste une référence
+  // vers les messages de la discussion en cours, pour que tout le code
+  // d'affichage écrit avant cette version continue de fonctionner.
+  function loadChats() {
+    var list = store.get("mob.chats", null);
+    if (Object.prototype.toString.call(list) === "[object Array]") return list;
+
+    // Migration : l'ancienne conversation unique devient la première du journal.
+    var old = store.get("mob.history", []);
+    list = [];
+    if (old && old.length) {
+      var first = null, last = null;
+      old.forEach(function (m) {
+        if (typeof m.ts !== "number") return;
+        if (first === null || m.ts < first) first = m.ts;
+        if (last === null || m.ts > last) last = m.ts;
+      });
+      var opener = null;
+      for (var i = 0; i < old.length; i++) if (old[i].role === "user") { opener = old[i].content; break; }
+      list.push({
+        id: uid(), title: titleOf(opener), messages: old,
+        created: first || Date.now(), updated: last || Date.now()
+      });
+    }
+    store.set("mob.chats", list);
+    try { localStorage.removeItem("mob.history"); } catch (e) { /* rien à faire */ }
+    return list;
+  }
+
+  var chats = loadChats();
+  // Chaque visite ouvre une discussion neuve : elle n'entre au journal
+  // qu'au premier message, sinon l'historique se remplirait de coquilles vides.
+  var current = blankChat();
+  var history = current.messages;
+  var busy = false;
+  var pendingQuestion = null;
+  var currentView = "home";
+
+  var el = function (id) { return document.getElementById(id); };
+  var els = {
+    messages: el("messages"), input: el("input"), send: el("send"), mic: el("mic"),
+    voiceToggle: el("voiceToggle"), nav: el("nav"),
+    headTitleText: el("headTitleText"), headSub: el("headSub"),
+    adminBadge: el("adminBadge"), navAdmin: el("navAdmin"), navSub: el("navSub"),
+    ask: el("ask"), askMic: el("askMic"),
+    bell: el("bell"), bellDot: el("bellDot"), notifs: el("notifs"), notifBody: el("notifBody"),
+    profileBtn: el("profileBtn"), avatar: el("avatar"),
+    profileName: el("profileName"), profileRole: el("profileRole"),
+    homeTabs: el("homeTabs"), period: el("period"), ranges: el("ranges"),
+    heroValue: el("heroValue"), heroDelta: el("heroDelta"), heroNote: el("heroNote"),
+    chartHost: el("chartHost"), watchlist: el("watchlist"), watchPeriod: el("watchPeriod"),
+    metrics: el("metrics"), quick: el("quick"), promoCta: el("promoCta"),
+    accountState: el("accountState"), accountWho: el("accountWho"),
+    displayNameInput: el("displayName"),
+    keyFields: el("keyFields"), key: el("key"), editKey: el("editKey"), signOut: el("signOut"),
+    themeSeg: el("themeSeg"), sizeSeg: el("sizeSeg"),
+    speakPref: el("speakPref"), rate: el("rate"), rateVal: el("rateVal"),
+    clearHistory: el("clearHistory"),
+    adminUnlock: el("adminUnlock"), adminCodeInput: el("adminCode"),
+    adminEnter: el("adminEnter"), adminLeave: el("adminLeave"), adminSub: el("adminSub"),
+    model: el("model"), ctx: el("ctx"), ctxVal: el("ctxVal"),
+    sysPrompt: el("sysPrompt"), resetPrompt: el("resetPrompt"), wipeAll: el("wipeAll"),
+    creations: el("creations"),
+    chatTitle: el("chatTitle"), newChat: el("newChat"), newChat2: el("newChat2"),
+    histList: el("histList"), clearAll: el("clearAll"),
+    statMsgs: el("statMsgs"), statImgs: el("statImgs"), statSites: el("statSites"), statSize: el("statSize")
+  };
+
+  /* ================= navigation ================= */
+
+  var TITLES = {
+    home:      ["Bonjour", "Voici ce que Mob a fait pour toi."],
+    chat:      ["Conversation", "Pose une question, demande une image ou une page."],
+    historique: ["Historique", "Retrouve et rouvre n'importe quelle discussion."],
+    creations: ["Créations", "Tout ce que Mob a produit pour toi."],
+    settings:  ["Réglages", "Compte, apparence, voix et données."],
+    help:      ["Aide", "Démarrer, déclencher à la voix, savoir où vont les données."],
+    admin:     ["Console d'administration", "Modèle, mémoire, personnalité et données."]
+  };
+
+  function show(view) {
+    // L'espace admin n'apparaît pas tant que le mode n'est pas actif : on
+    // rabat sur l'accueil plutôt que d'afficher une vue vide.
+    if (view === "admin" && !isAdmin()) view = "home";
+    if (!TITLES[view]) view = "home";
+    currentView = view;
+
+    var views = document.querySelectorAll(".view");
+    for (var i = 0; i < views.length; i++) {
+      views[i].classList.toggle("active", views[i].id === "view-" + view);
+    }
+    var buttons = els.nav.querySelectorAll("button[data-view]");
+    for (var j = 0; j < buttons.length; j++) {
+      if (buttons[j].dataset.view === view) buttons[j].setAttribute("aria-current", "page");
+      else buttons[j].removeAttribute("aria-current");
+    }
+
+    var t = TITLES[view];
+    els.headTitleText.textContent =
+      view === "home" && displayName() ? t[0] + ", " + displayName() : t[0];
+    els.headSub.textContent = t[1];
+
+    if (view === "home") renderHome();
+    if (view === "historique") renderHistory();
+    if (view === "creations") renderCreations();
+    if (view === "admin") renderAdmin();
+    if (view === "settings") syncAccount();
+    closeNotifs();
+    store.set("mob.view", view);
+  }
+
+  els.nav.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-view]");
+    if (b) show(b.dataset.view);
+  });
+
+  els.profileBtn.addEventListener("click", function () { show("settings"); });
+
+  /* ================= tableau de bord ================= */
+
+  var TABS = ["apercu", "activite", "outils"];
+
+  function currentTab() {
+    var t = store.get("mob.tab", "apercu");
+    return TABS.indexOf(t) === -1 ? "apercu" : t;
+  }
+
+  function applyTab(tab) {
+    var buttons = els.homeTabs.querySelectorAll("button[data-tab]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-selected", buttons[i].dataset.tab === tab ? "true" : "false");
+    }
+    var panels = document.querySelectorAll("#view-home [data-section]");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].hidden = panels[j].dataset.section.split(" ").indexOf(tab) === -1;
+    }
+  }
+
+  els.homeTabs.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]");
+    if (!b) return;
+    store.set("mob.tab", b.dataset.tab);
+    applyTab(b.dataset.tab);
+    renderChart();
+  });
+
+  function periodDays() { return parseInt(store.get("mob.period", 30), 10) || 30; }
+
+  els.period.addEventListener("change", function () {
+    store.set("mob.period", parseInt(els.period.value, 10));
+    renderHome();
+  });
+
+  // Les messages d'avant l'ajout de l'horodatage n'en ont pas : ils sont
+  // comptés dans le total mais jamais dans une fenêtre de temps, plutôt que
+  // d'être datés d'aujourd'hui par défaut, ce qui gonflerait les chiffres.
+  function within(m, from, to) {
+    return typeof m.ts === "number" && m.ts >= from && m.ts < to;
+  }
+
+  function countIn(pool, from, to, test) {
+    var n = 0;
+    for (var i = 0; i < pool.length; i++) {
+      if (within(pool[i], from, to) && test(pool[i])) n++;
+    }
+    return n;
+  }
+
+  var isUser = function (m) { return m.role === "user"; };
+  var isBot = function (m) { return m.role === "assistant"; };
+  var isImage = function (m) { return m.role === "assistant" && /IMAGE\([^)]+\)/i.test(m.content); };
+  var isSite = function (m) { return m.role === "assistant" && !!extractHtml(m.content); };
+  var any = function () { return true; };
+
+  function deltaBadge(cur, prev) {
+    var span = document.createElement("span");
+    span.className = "delta ";
+    if (!prev && !cur) { span.className += "flat"; span.textContent = "—"; }
+    else if (!prev) { span.className += "up"; span.textContent = "nouveau"; }
+    else {
+      var pct = Math.round(((cur - prev) / prev) * 100);
+      span.className += pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+      span.textContent = (pct > 0 ? "+" : "") + pct + " %";
+    }
+    return span;
+  }
+
+  function renderHome() {
+    els.period.value = String(periodDays());
+    applyTab(currentTab());
+
+    var days = periodDays();
+    var span = days * 86400000;
+    var now = Date.now();
+    var curFrom = now - span, prevFrom = now - 2 * span;
+
+    var pool = allMessages();
+    var cur = countIn(pool, curFrom, now + 1, any);
+    var prev = countIn(pool, prevFrom, curFrom, any);
+
+    els.heroValue.textContent = String(cur);
+    els.heroDelta.replaceWith(deltaBadgeInto(els.heroDelta, cur, prev));
+    els.heroNote.textContent = "sur " + pool.length +
+      (pool.length > 1 ? " messages conservés" : " message conservé");
+    els.watchPeriod.textContent = days >= 365 ? "12 mois" : days + " j";
+
+    renderWatchlist(pool, curFrom, prevFrom, now);
+    renderMetrics();
+    renderQuick();
+    renderChart();
+    syncNotifs();
+  }
+
+  // Remplace le badge en gardant son identifiant, pour que les contrôles
+  // automatiques continuent de le retrouver.
+  function deltaBadgeInto(node, cur, prev) {
+    var fresh = deltaBadge(cur, prev);
+    fresh.id = node.id;
+    els.heroDelta = fresh;
+    return fresh;
+  }
+
+  var WATCH = [
+    { ic: "🙋", name: "Questions posées", sub: "tes messages", test: isUser },
+    { ic: "🤖", name: "Réponses de Mob", sub: "messages du modèle", test: isBot },
+    { ic: "🖼", name: "Images générées", sub: "via Pollinations", test: isImage },
+    { ic: "🧾", name: "Pages générées", sub: "documents HTML", test: isSite }
+  ];
+
+  function renderWatchlist(pool, curFrom, prevFrom, now) {
+    els.watchlist.innerHTML = "";
+    WATCH.forEach(function (w) {
+      var cur = countIn(pool, curFrom, now + 1, w.test);
+      var prev = countIn(pool, prevFrom, curFrom, w.test);
+
+      var row = document.createElement("div");
+      row.className = "list-row";
+
+      var ic = document.createElement("div");
+      ic.className = "ic"; ic.textContent = w.ic;
+      row.appendChild(ic);
+
+      var nm = document.createElement("div");
+      nm.className = "nm";
+      var b = document.createElement("b"); b.textContent = w.name;
+      var s = document.createElement("small"); s.textContent = w.sub;
+      nm.appendChild(b); nm.appendChild(s);
+      row.appendChild(nm);
+
+      var vl = document.createElement("div");
+      vl.className = "vl";
+      var v = document.createElement("b"); v.textContent = String(cur);
+      vl.appendChild(v);
+      vl.appendChild(deltaBadge(cur, prev));
+      row.appendChild(vl);
+
+      els.watchlist.appendChild(row);
+    });
+  }
+
+  function storageBytes() {
+    var bytes = 0;
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf("mob.") === 0; })
+        .forEach(function (k) { bytes += (localStorage.getItem(k) || "").length; });
+    } catch (e) { /* stockage illisible */ }
+    return bytes;
+  }
+
+  function humanBytes(b) { return b > 1024 ? (b / 1024).toFixed(1) + " Ko" : b + " o"; }
+
+  function totals() {
+    var pool = allMessages();
+    var t = { msgs: pool.length, images: 0, sites: 0, chats: chats.length };
+    pool.forEach(function (m) {
+      if (isImage(m)) t.images++;
+      if (isSite(m)) t.sites++;
+    });
+    return t;
+  }
+
+  function renderMetrics() {
+    var t = totals();
+    var tiles = [
+      { ic: "🕘", v: String(t.chats), k: "discussions" },
+      { ic: "💬", v: String(t.msgs), k: "messages conservés" },
+      { ic: "🖼", v: String(t.images), k: "images" },
+      { ic: "🧾", v: String(t.sites), k: "pages web" }
+    ];
+    els.metrics.innerHTML = "";
+    tiles.forEach(function (m) {
+      var d = document.createElement("div");
+      d.className = "metric";
+      var i = document.createElement("div"); i.className = "ic"; i.textContent = m.ic;
+      var b = document.createElement("b"); b.textContent = m.v;
+      var s = document.createElement("small"); s.textContent = m.k;
+      d.appendChild(i); d.appendChild(b); d.appendChild(s);
+      els.metrics.appendChild(d);
+    });
+  }
+
+  var QUICK = [
+    { ic: "🖼", t: "Générer une image", s: "décris, Mob dessine", q: "Génère une image de " },
+    { ic: "🧾", t: "Écrire une page web", s: "un fichier HTML complet", q: "Programme-moi une page web qui " },
+    { ic: "📝", t: "Résumer un texte", s: "colle, Mob condense", q: "Résume ce texte : " },
+    { ic: "💡", t: "Trouver des idées", s: "dix pistes d'un coup", q: "Donne-moi dix idées pour " }
+  ];
+
+  function renderQuick() {
+    els.quick.innerHTML = "";
+    QUICK.forEach(function (a) {
+      var b = document.createElement("button");
+      b.type = "button";
+      var i = document.createElement("span"); i.className = "ic"; i.textContent = a.ic;
+      var t = document.createElement("b"); t.textContent = a.t;
+      var s = document.createElement("small"); s.textContent = a.s;
+      b.appendChild(i); b.appendChild(t); b.appendChild(s);
+      // Le texte est déposé dans la saisie plutôt qu'envoyé tel quel :
+      // il se termine par « … de », il attend d'être complété.
+      b.addEventListener("click", function () {
+        show("chat");
+        els.input.value = a.q;
+        autosize();
+        els.input.focus();
+      });
+      els.quick.appendChild(b);
+    });
+  }
+
+  /* ---------- graphique ---------- */
+
+  var RANGES = {
+    "1J": { buckets: 12, ms: 2 * 3600000, fmt: function (d) { return d.getHours() + "h"; } },
+    "1S": { buckets: 7,  ms: 86400000,    fmt: function (d) { return ["dim","lun","mar","mer","jeu","ven","sam"][d.getDay()]; } },
+    "1M": { buckets: 30, ms: 86400000,    fmt: function (d) { return d.getDate() + "/" + (d.getMonth() + 1); } },
+    "6M": { buckets: 26, ms: 7 * 86400000, fmt: function (d) { return d.getDate() + "/" + (d.getMonth() + 1); } },
+    "1A": { buckets: 12, ms: 30 * 86400000, fmt: function (d) { return ["jan","fév","mar","avr","mai","juin","juil","août","sep","oct","nov","déc"][d.getMonth()]; } }
+  };
+
+  function currentRange() {
+    var r = store.get("mob.range", "1M");
+    return RANGES[r] ? r : "1M";
+  }
+
+  els.ranges.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-range]");
+    if (!b) return;
+    store.set("mob.range", b.dataset.range);
+    renderChart();
+  });
+
+  function series(rangeKey) {
+    var r = RANGES[rangeKey];
+    var now = Date.now();
+    var start = now - r.buckets * r.ms;
+    var pool = allMessages();
+    var pts = [];
+    for (var i = 0; i < r.buckets; i++) {
+      var from = start + i * r.ms;
+      pts.push({ from: from, label: r.fmt(new Date(from)), v: countIn(pool, from, from + r.ms, any) });
+    }
+    return pts;
+  }
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svgEl(name, attrs) {
+    var n = document.createElementNS(SVGNS, name);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  function renderChart() {
+    var key = currentRange();
+    var buttons = els.ranges.querySelectorAll("button[data-range]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", buttons[i].dataset.range === key ? "true" : "false");
+    }
+
+    els.chartHost.innerHTML = "";
+    var pts = series(key);
+    var max = 0;
+    pts.forEach(function (p) { if (p.v > max) max = p.v; });
+
+    if (!max) {
+      var none = document.createElement("div");
+      none.className = "chart-empty";
+      none.textContent = allMessages().length
+        ? "Pas d'activité datée sur cette période."
+        : "Rien à afficher pour l'instant — pose ta première question.";
+      els.chartHost.appendChild(none);
+      return;
+    }
+
+    var W = Math.max(240, els.chartHost.clientWidth || 300), H = 168, PAD = 10;
+    var stepX = pts.length > 1 ? (W - 2 * PAD) / (pts.length - 1) : 0;
+    var scaleY = function (v) { return H - PAD - (v / max) * (H - 2 * PAD); };
+    var x = function (i) { return PAD + i * stepX; };
+
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img" });
+    svg.setAttribute("aria-label", "Activité sur " + key);
+
+    var defs = svgEl("defs");
+    var grad = svgEl("linearGradient", { id: "mobFill", x1: "0", y1: "0", x2: "0", y2: "1" });
+    grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "var(--accent)", "stop-opacity": ".38" }));
+    grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "var(--accent)", "stop-opacity": "0" }));
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    for (var g = 0; g <= 3; g++) {
+      var y = PAD + (g / 3) * (H - 2 * PAD);
+      svg.appendChild(svgEl("line", {
+        x1: PAD, y1: y, x2: W - PAD, y2: y,
+        stroke: "var(--line-soft)", "stroke-width": "1"
+      }));
+    }
+
+    var line = "", area = "";
+    pts.forEach(function (p, i) {
+      var px = x(i), py = scaleY(p.v);
+      line += (i ? " L" : "M") + px + " " + py;
+    });
+    area = line + " L" + x(pts.length - 1) + " " + (H - PAD) + " L" + x(0) + " " + (H - PAD) + " Z";
+
+    svg.appendChild(svgEl("path", { d: area, fill: "url(#mobFill)", stroke: "none" }));
+    svg.appendChild(svgEl("path", {
+      d: line, fill: "none", stroke: "var(--accent)", "stroke-width": "2.5",
+      "stroke-linejoin": "round", "stroke-linecap": "round"
+    }));
+
+    var marker = svgEl("circle", { r: "5", fill: "var(--accent)", stroke: "var(--panel)", "stroke-width": "3" });
+    svg.appendChild(marker);
+
+    els.chartHost.appendChild(svg);
+
+    var axis = document.createElement("div");
+    axis.className = "chart-x";
+    [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
+      var s = document.createElement("span");
+      s.textContent = pts[i].label;
+      axis.appendChild(s);
+    });
+    els.chartHost.appendChild(axis);
+
+    var tip = document.createElement("div");
+    tip.className = "tip";
+    els.chartHost.appendChild(tip);
+
+    // Le sommet est mis en avant d'emblée, comme l'infobulle de la référence ;
+    // le doigt ou la souris la déplacent ensuite.
+    var peak = 0;
+    pts.forEach(function (p, i) { if (p.v > pts[peak].v) peak = i; });
+
+    function highlight(i) {
+      var p = pts[i];
+      marker.setAttribute("cx", x(i));
+      marker.setAttribute("cy", scaleY(p.v));
+      tip.innerHTML = "";
+      var b = document.createElement("b");
+      b.textContent = p.v + (p.v > 1 ? " messages" : " message");
+      var s = document.createElement("small");
+      s.textContent = p.label;
+      tip.appendChild(b); tip.appendChild(s);
+      tip.style.left = Math.min(Math.max(x(i), 52), W - 52) + "px";
+      // Près du haut, l'infobulle passe sous le point : au-dessus, elle
+      // sortirait de la carte et recouvrirait le panneau précédent.
+      var y = scaleY(p.v);
+      var above = y > 54;
+      tip.style.top = y + "px";
+      tip.style.transform = above ? "translate(-50%, -120%)" : "translate(-50%, 28%)";
+    }
+    highlight(peak);
+
+    svg.addEventListener("pointermove", function (e) {
+      var box = svg.getBoundingClientRect();
+      var i = Math.round((e.clientX - box.left - PAD) / (stepX || 1));
+      highlight(Math.min(pts.length - 1, Math.max(0, i)));
+    });
+  }
+
+  /* ================= notifications ================= */
+
+  function ago(ts) {
+    var s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return "à l'instant";
+    if (s < 3600) return "il y a " + Math.round(s / 60) + " min";
+    if (s < 86400) return "il y a " + Math.round(s / 3600) + " h";
+    return "il y a " + Math.round(s / 86400) + " j";
+  }
+
+  function notices() {
+    var out = [];
+    if (!store.get("mob.key", "")) {
+      out.push(["🔑", "Aucune clé enregistrée", "Ajoute-la dans Réglages pour que Mob réponde.", true]);
+    } else {
+      out.push(["✅", "Compte connecté", "Clé ···" + store.get("mob.key", "").slice(-4) + " sur cet appareil.", false]);
+    }
+    var pool = allMessages();
+    var last = null;
+    for (var i = pool.length - 1; i >= 0; i--) {
+      if (typeof pool[i].ts === "number") { last = pool[i].ts; break; }
+    }
+    out.push(["🕑", "Dernière activité", last ? ago(last) : "aucune activité datée", false]);
+    var t = totals();
+    out.push(["🕘", "Discussions", t.chats + " conservée(s) dans l'historique.", false]);
+    out.push(["🎨", "Créations", t.images + " image(s), " + t.sites + " page(s).", false]);
+    if (isAdmin()) out.push(["🛡️", "Mode administrateur actif", "Les réglages avancés sont ouverts.", false]);
+    return out;
+  }
+
+  function syncNotifs() {
+    var list = notices();
+    els.notifBody.innerHTML = "";
+    var urgent = false;
+    list.forEach(function (n) {
+      if (n[3]) urgent = true;
+      var row = document.createElement("div");
+      row.className = "note-line";
+      var i = document.createElement("span"); i.textContent = n[0];
+      var w = document.createElement("span");
+      var b = document.createElement("b"); b.textContent = n[1];
+      var s = document.createElement("small"); s.textContent = n[2];
+      w.appendChild(b); w.appendChild(s);
+      row.appendChild(i); row.appendChild(w);
+      els.notifBody.appendChild(row);
+    });
+    els.bellDot.hidden = !urgent;
+  }
+
+  function closeNotifs() {
+    els.notifs.hidden = true;
+    els.bell.setAttribute("aria-pressed", "false");
+  }
+
+  els.bell.addEventListener("click", function (e) {
+    e.stopPropagation();
+    syncNotifs();
+    var open = els.notifs.hidden;
+    els.notifs.hidden = !open;
+    els.bell.setAttribute("aria-pressed", open ? "true" : "false");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (els.notifs.hidden) return;
+    if (els.notifs.contains(e.target) || els.bell.contains(e.target)) return;
+    closeNotifs();
+  });
+
+  /* ================= conversation ================= */
+
+  var SUGGESTIONS = [
+    "Génère une image de robot violet",
+    "Programme-moi une page de compteur",
+    "Explique-moi les trous noirs"
+  ];
+
+  function render() {
+    els.messages.innerHTML = "";
+
+    if (!history.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      var big = document.createElement("div");
+      big.className = "big"; big.textContent = "M";
+      empty.appendChild(big);
+      var strong = document.createElement("strong");
+      strong.textContent = "Mob est prêt.";
+      empty.appendChild(strong);
+      var line = document.createElement("div");
+      line.textContent = store.get("mob.key", "")
+        ? "Pose une question, ou touche 🎙 pour parler."
+        : "Commence par ajouter ta clé dans Réglages.";
+      empty.appendChild(line);
+
+      if (store.get("mob.key", "")) {
+        var sg = document.createElement("div");
+        sg.className = "suggest";
+        SUGGESTIONS.forEach(function (s) {
+          var b = document.createElement("button");
+          b.type = "button"; b.textContent = s;
+          b.addEventListener("click", function () { unlockSpeech(); ask(s); });
+          sg.appendChild(b);
+        });
+        empty.appendChild(sg);
+      }
+      els.messages.appendChild(empty);
+      return;
+    }
+
+    // Seules les dernières bulles sont dessinées : redessiner mille messages
+    // à chaque tour finirait par rendre la saisie poussive. L'historique
+    // complet reste stocké et continue d'alimenter le modèle.
+    var shown = history.slice(-DRAWN_MESSAGES);
+    if (history.length > shown.length) {
+      var older = document.createElement("div");
+      older.className = "older";
+      older.textContent = (history.length - shown.length) +
+        " messages plus anciens — conservés, mais non affichés";
+      els.messages.appendChild(older);
+    }
+    shown.forEach(function (m) { els.messages.appendChild(renderMessage(m)); });
+    scrollDown();
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(function () {
+      var s = els.messages.parentElement;
+      s.scrollTop = s.scrollHeight;
+    });
+  }
+
+  function renderMessage(m) {
+    var d = document.createElement("div");
+    d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
+    if (m.role !== "assistant") { d.textContent = m.content; return d; }
+
+    var text = m.content;
+    var image = text.match(/IMAGE\(([^)]+)\)/i);
+    if (image) text = text.replace(image[0], "").trim();
+
+    var code = extractHtml(text);
+    // Un document HTML entier dans une bulle est illisible sur téléphone.
+    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
+
+    if (text) {
+      var body = document.createElement("div");
+      body.textContent = text;
+      d.appendChild(body);
+    }
+    if (image) d.appendChild(imageBlock(image[1].trim()));
+    if (code) d.appendChild(siteBlock(code));
+    return d;
+  }
+
+  function extractHtml(text) {
+    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
+    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
+    return null;
+  }
 
   // Graine dérivée du texte : la même description redonne la même image,
-  // sinon chaque redessin de la conversation en générerait une nouvelle.
+  // sinon chaque redessin en générerait une nouvelle.
   function seedOf(s) {
     var h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
@@ -418,142 +1594,19 @@
       "?width=768&height=768&nologo=true&seed=" + seedOf(prompt);
   }
 
-  var store = {
-    get: function (k, fallback) {
-      try {
-        var v = localStorage.getItem(k);
-        return v === null ? fallback : JSON.parse(v);
-      } catch (e) { return fallback; }
-    },
-    set: function (k, v) {
-      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé : on continue sans persistance */ }
-    }
-  };
-
-  var history = store.get("mob.history", []);
-  var busy = false;
-  var pendingQuestion = null;
-
-  var els = {
-    messages: document.getElementById("messages"),
-    input: document.getElementById("input"),
-    send: document.getElementById("send"),
-    mic: document.getElementById("mic"),
-    voiceToggle: document.getElementById("voiceToggle"),
-    settings: document.getElementById("settings"),
-    openSettings: document.getElementById("openSettings"),
-    settingsForm: document.getElementById("settingsForm"),
-    key: document.getElementById("key"),
-    model: document.getElementById("model"),
-    speakPref: document.getElementById("speakPref"),
-    clearHistory: document.getElementById("clearHistory"),
-    accountState: document.getElementById("accountState"),
-    accountWho: document.getElementById("accountWho"),
-    keyFields: document.getElementById("keyFields"),
-    editKey: document.getElementById("editKey"),
-    signOut: document.getElementById("signOut"),
-    closeSettings: document.getElementById("closeSettings"),
-    themeSeg: document.getElementById("themeSeg"),
-    sizeSeg: document.getElementById("sizeSeg"),
-    rate: document.getElementById("rate"),
-    rateVal: document.getElementById("rateVal"),
-    ctx: document.getElementById("ctx"),
-    ctxVal: document.getElementById("ctxVal")
-  };
-
-  /* ---------- rendu ---------- */
-
-  function render() {
-    els.messages.innerHTML = "";
-
-    if (!history.length) {
-      var empty = document.createElement("div");
-      empty.className = "empty";
-      empty.innerHTML = "<strong>Mob est prêt.</strong>" +
-        (store.get("mob.key", "") ? "Pose une question, ou touche 🎙 pour parler."
-                                  : "Commence par ajouter ta clé d'API dans ⚙.");
-      els.messages.appendChild(empty);
-      return;
-    }
-
-    // Seules les dernières bulles sont dessinées : redessiner mille
-    // messages à chaque tour finirait par rendre la saisie poussive.
-    // L'historique complet reste stocké et continue d'alimenter le modèle.
-    var shown = history.slice(-DRAWN_MESSAGES);
-    if (history.length > shown.length) {
-      var older = document.createElement("div");
-      older.className = "older";
-      older.textContent = (history.length - shown.length) +
-        " messages plus anciens — conservés, mais non affichés";
-      els.messages.appendChild(older);
-    }
-    shown.forEach(function (m) {
-      els.messages.appendChild(renderMessage(m));
-    });
-
-    scrollDown();
-  }
-
-  /**
-   * Une bulle de conversation. Les réponses de Mob peuvent contenir deux
-   * choses que du texte brut ne rend pas : un marqueur IMAGE(...) — même
-   * convention que le CALC(...) de la version Python — et une page HTML
-   * complète. Les deux sont extraits du texte affiché et remplacés par
-   * quelque chose d'utilisable : l'image elle-même, ou des boutons.
-   */
-  function renderMessage(m) {
-    var d = document.createElement("div");
-    d.className = "msg " + (m.role === "user" ? "user" : m.role === "error" ? "error" : "bot");
-
-    if (m.role !== "assistant") {
-      d.textContent = m.content;
-      return d;
-    }
-
-    var text = m.content;
-    var image = text.match(/IMAGE\(([^)]+)\)/i);
-    if (image) text = text.replace(image[0], "").trim();
-
-    var code = extractHtml(text);
-    // Un document HTML entier dans une bulle est illisible sur téléphone :
-    // on le retire du texte, il reste accessible par les boutons.
-    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
-
-    if (text) {
-      var body = document.createElement("div");
-      body.textContent = text;
-      d.appendChild(body);
-    }
-    if (image) d.appendChild(imageBlock(image[1].trim()));
-    if (code) d.appendChild(siteBlock(code));
-
-    return d;
-  }
-
-  function extractHtml(text) {
-    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
-    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
-    return null;
-  }
-
   function imageBlock(prompt) {
     var wrap = document.createElement("div");
     wrap.className = "gen";
-
     var img = document.createElement("img");
-    img.alt = prompt;
-    img.loading = "lazy";
-    img.src = imageURL(prompt);
+    img.alt = prompt; img.loading = "lazy"; img.src = imageURL(prompt);
     img.onerror = function () {
       wrap.className = "gen-fail";
-      wrap.textContent = "Image indisponible — le service gratuit est limité " +
-        "à environ une image toutes les 15 secondes. Réessaie dans un instant.";
+      wrap.textContent = "Image indisponible — le service gratuit est limité à " +
+        "environ une image toutes les 15 secondes. Réessaie dans un instant.";
     };
     wrap.appendChild(img);
-
     var cap = document.createElement("div");
-    cap.className = "cap";
-    cap.textContent = prompt;
+    cap.className = "cap"; cap.textContent = prompt;
     wrap.appendChild(cap);
     return wrap;
   }
@@ -561,32 +1614,24 @@
   function siteBlock(code) {
     var wrap = document.createElement("div");
     wrap.className = "gen-actions";
-
     function button(label, fn) {
       var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = label;
+      b.type = "button"; b.textContent = label;
       b.addEventListener("click", fn);
       wrap.appendChild(b);
       return b;
     }
-
     button("👁 Aperçu", function () {
       var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
       window.open(url, "_blank");
-      // Laisser le temps à l'onglet de charger avant de libérer l'URL.
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
     });
-
     button("⬇ Enregistrer", function () {
       var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
       var a = document.createElement("a");
-      a.href = url;
-      a.download = "site.html";
-      a.click();
+      a.href = url; a.download = "site.html"; a.click();
       setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
     });
-
     var copy = button("⧉ Copier le code", function () {
       if (!navigator.clipboard) return;
       navigator.clipboard.writeText(code).then(function () {
@@ -594,44 +1639,152 @@
         setTimeout(function () { copy.textContent = "⧉ Copier le code"; }, 1600);
       });
     });
-
     return wrap;
   }
 
-  function scrollDown() {
-    requestAnimationFrame(function () {
-      els.messages.scrollTop = els.messages.scrollHeight;
-    });
-  }
-
   function showThinking(on) {
-    var existing = document.getElementById("thinking");
+    var existing = el("thinking");
     if (existing) existing.remove();
     if (!on) return;
     var d = document.createElement("div");
-    d.className = "thinking";
-    d.id = "thinking";
+    d.className = "thinking"; d.id = "thinking";
     d.innerHTML = "Mob réfléchit <span>·</span><span>·</span><span>·</span>";
     els.messages.appendChild(d);
     scrollDown();
   }
 
   function push(role, content) {
-    history.push({ role: role, content: content });
-    store.set("mob.history", history);
+    // L'horodatage est ce qui alimente le tableau de bord : sans lui,
+    // aucune courbe ni variation n'est calculable.
+    history.push({ role: role, content: content, ts: Date.now() });
+    current.updated = Date.now();
+    if (!current.title && role === "user") current.title = titleOf(content);
+    // Entrée au journal au premier message seulement.
+    if (chats.indexOf(current) === -1) chats.unshift(current);
+    saveChats();
     render();
+    syncChatBar();
+    if (currentView === "home") renderHome();
+    if (currentView === "historique") renderHistory();
   }
 
-  /* ---------- appel API ---------- */
+  /* ================= journal des discussions ================= */
+
+  function syncChatBar() {
+    els.chatTitle.textContent = current.title || "Nouvelle discussion";
+  }
+
+  function startNewChat() {
+    // Une discussion déjà vide n'a pas besoin d'être remplacée.
+    if (current.messages.length) {
+      current = blankChat();
+      history = current.messages;
+      render();
+    }
+    syncChatBar();
+    show("chat");
+  }
+
+  function openChat(id) {
+    for (var i = 0; i < chats.length; i++) {
+      if (chats[i].id !== id) continue;
+      current = chats[i];
+      history = current.messages;
+      render();
+      syncChatBar();
+      show("chat");
+      return;
+    }
+  }
+
+  function deleteChat(id) {
+    if (!confirm("Supprimer cette discussion ?")) return;
+    for (var i = 0; i < chats.length; i++) {
+      if (chats[i].id !== id) continue;
+      var wasCurrent = chats[i] === current;
+      chats.splice(i, 1);
+      saveChats();
+      if (wasCurrent) {
+        current = blankChat();
+        history = current.messages;
+        render();
+        syncChatBar();
+      }
+      break;
+    }
+    renderHistory();
+  }
+
+  function when(ts) {
+    var d = new Date(ts);
+    var today = new Date();
+    var sameDay = d.toDateString() === today.toDateString();
+    var hh = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+    return sameDay ? "aujourd'hui à " + hh
+                   : d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear() + " à " + hh;
+  }
+
+  function renderHistory() {
+    els.histList.innerHTML = "";
+    if (!chats.length) {
+      var p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "Aucune discussion enregistrée pour l'instant. " +
+        "Dès que tu poses une question, elle apparaît ici.";
+      els.histList.appendChild(p);
+      return;
+    }
+
+    chats.slice().sort(function (a, b) { return b.updated - a.updated; }).forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "hist-row" + (c === current ? " current" : "");
+
+      var open = document.createElement("button");
+      open.type = "button"; open.className = "hist-open";
+      var t = document.createElement("b");
+      t.textContent = c.title || "Discussion";
+      var sub = document.createElement("small");
+      sub.textContent = c.messages.length + " message" + (c.messages.length > 1 ? "s" : "") +
+        " · " + when(c.updated) + (c === current ? " · en cours" : "");
+      open.appendChild(t); open.appendChild(sub);
+      open.addEventListener("click", function () { openChat(c.id); });
+      row.appendChild(open);
+
+      var del = document.createElement("button");
+      del.type = "button"; del.className = "hist-del";
+      del.title = "Supprimer"; del.setAttribute("aria-label", "Supprimer cette discussion");
+      del.textContent = "🗑";
+      del.addEventListener("click", function () { deleteChat(c.id); });
+      row.appendChild(del);
+
+      els.histList.appendChild(row);
+    });
+  }
+
+  els.newChat.addEventListener("click", startNewChat);
+  els.newChat2.addEventListener("click", startNewChat);
+
+  els.clearAll.addEventListener("click", function () {
+    if (!confirm("Effacer toutes les discussions de cet appareil ?")) return;
+    chats = [];
+    saveChats();
+    current = blankChat();
+    history = current.messages;
+    render();
+    syncChatBar();
+    renderHistory();
+  });
+
+  /* ================= appel au modèle ================= */
 
   function ask(text) {
     var key = store.get("mob.key", "");
     if (!key) {
-      push("error", "Aucune clé d'API. Touche ⚙ pour en ajouter une.");
-      els.settings.showModal();
+      pendingQuestion = text;
+      show("settings");
       return;
     }
-
+    show("chat");
     push("user", text);
     busy = true;
     els.send.disabled = true;
@@ -642,27 +1795,23 @@
       .slice(-contextWindow())
       .map(function (m) { return { role: m.role, content: m.content }; });
 
-    var payload = {
-      model: store.get("mob.model", "mistral-small-latest"),
-      messages: [{ role: "system", content: SYSTEM }].concat(recent)
-    };
-
     fetch(API, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + key
-      },
-      body: JSON.stringify(payload)
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify({
+        model: store.get("mob.model", "mistral-small-latest"),
+        messages: [{ role: "system", content: systemPrompt() }].concat(recent)
+      })
     })
       .then(function (res) {
         return res.json().catch(function () { return null; }).then(function (data) {
           if (!res.ok) {
-            var detail = (data && (data.detail || data.message)) || ("erreur " + res.status);
+            var detail = (data && data.detail) || ("erreur " + res.status);
             if (typeof detail === "object") detail = JSON.stringify(detail);
             throw new Error(
-              res.status === 401 ? "Clé d'API refusée. Vérifie-la dans ⚙."
-              : res.status === 429 ? "Trop de requêtes d'un coup (limite du palier gratuit). Attends un instant."
+              res.status === 401 || res.status === 403
+                ? "Clé d'API refusée. Vérifie-la dans Réglages."
+              : res.status === 429 ? "Trop de requêtes d'un coup. Attends un instant."
               : detail
             );
           }
@@ -681,21 +1830,17 @@
         // Dégradation propre : un message lisible, jamais une page cassée.
         showThinking(false);
         push("error", err && err.message ? err.message
-                                         : "Impossible de joindre Mistral. Vérifie ta connexion.");
+                                         : "Impossible de joindre le serveur. Vérifie ta connexion.");
       })
-      .then(function () {
-        busy = false;
-        els.send.disabled = false;
-      });
+      .then(function () { busy = false; els.send.disabled = false; });
   }
 
-  /* ---------- synthèse vocale ---------- */
+  /* ================= voix ================= */
 
   var speechUnlocked = false;
 
   // iOS n'autorise la synthèse vocale que si elle a d'abord été déclenchée
-  // par un geste de l'utilisateur. On la « débloque » silencieusement au
-  // premier appui, sinon les réponses arrivent muettes.
+  // par un geste : sans ce déblocage, les réponses arrivent muettes.
   function unlockSpeech() {
     if (speechUnlocked || !("speechSynthesis" in window)) return;
     try {
@@ -717,51 +1862,44 @@
     } catch (e) { /* idem */ }
   }
 
-  /* ---------- reconnaissance vocale ---------- */
-
   var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recog = null;
-  var listening = false;
+  var recog = null, listening = false, recogTarget = els.input;
 
   if (!Recognition) {
-    // Safari iOS ne l'expose pas partout : on garde la saisie au clavier,
-    // qui elle marche toujours.
+    // Sans dictée, le micro du composeur disparaît et celui de la barre de
+    // recherche devient un simple bouton d'envoi : aucun bouton mort.
     els.mic.style.display = "none";
+    els.askMic.textContent = "↑";
+    els.askMic.title = "Envoyer";
+    els.askMic.setAttribute("aria-label", "Envoyer");
   } else {
     recog = new Recognition();
     recog.lang = "fr-FR";
     recog.interimResults = true;
     recog.continuous = false;
-
     recog.onresult = function (e) {
       var t = "";
       for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-      els.input.value = t;
-      autosize();
+      recogTarget.value = t;
+      if (recogTarget === els.input) autosize();
     };
     recog.onerror = function () { stopListening(); };
     recog.onend = function () {
       stopListening();
-      var t = els.input.value.trim();
-      if (t && !busy) { els.input.value = ""; autosize(); ask(t); }
+      var t = recogTarget.value.trim();
+      if (t && !busy) { recogTarget.value = ""; if (recogTarget === els.input) autosize(); ask(t); }
     };
   }
 
-  function startListening() {
+  function startListening(target) {
     if (!recog || listening) return;
-    try {
-      recog.start();
-      listening = true;
-      els.mic.classList.add("listening");
-    } catch (e) { stopListening(); }
+    recogTarget = target;
+    try { recog.start(); listening = true; els.mic.classList.add("listening"); }
+    catch (e) { stopListening(); }
   }
+  function stopListening() { listening = false; els.mic.classList.remove("listening"); }
 
-  function stopListening() {
-    listening = false;
-    els.mic.classList.remove("listening");
-  }
-
-  /* ---------- événements ---------- */
+  /* ================= saisie ================= */
 
   function autosize() {
     els.input.style.height = "auto";
@@ -783,41 +1921,48 @@
   els.send.addEventListener("click", function () { unlockSpeech(); submit(); });
   els.mic.addEventListener("click", function () {
     unlockSpeech();
-    listening ? recog.stop() : startListening();
+    listening ? recog.stop() : startListening(els.input);
   });
 
-  els.voiceToggle.addEventListener("click", function () {
+  // La barre « Demande à Mob » de l'en-tête : elle bascule dans la
+  // conversation, comme la recherche de la référence ouvre son résultat.
+  function submitAsk() {
+    var t = els.ask.value.trim();
+    if (!t || busy) return;
+    els.ask.value = "";
     unlockSpeech();
-    var on = !store.get("mob.speak", false);
-    store.set("mob.speak", on);
-    syncVoiceButton();
-    if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+    ask(t);
+  }
+  els.ask.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); submitAsk(); }
+  });
+  els.askMic.addEventListener("click", function () {
+    unlockSpeech();
+    if (!recog) { submitAsk(); return; }
+    if (els.ask.value.trim()) { submitAsk(); return; }
+    listening ? recog.stop() : startListening(els.ask);
   });
 
-  function syncVoiceButton() {
-    var on = store.get("mob.speak", false);
-    els.voiceToggle.setAttribute("aria-pressed", on ? "true" : "false");
-    els.voiceToggle.textContent = on ? "🔊" : "🔈";
-    els.speakPref.checked = on;
-  }
+  els.promoCta.addEventListener("click", function () {
+    show("chat");
+    els.input.focus();
+  });
 
-  /* ---------- apparence ---------- */
+  /* ================= apparence ================= */
 
   var systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
-  // « auto » n'est pas une valeur CSS : on la résout ici en interrogeant le
-  // système, et on repose data-theme en dur pour que la feuille de style
-  // n'ait que deux cas à connaître.
+  // « auto » n'est pas une valeur CSS : on la résout ici et on repose
+  // data-theme en dur, pour que la feuille de style n'ait que deux cas.
   function applyTheme() {
     var choice = store.get("mob.theme", "auto");
     var dark = choice === "dark" || (choice === "auto" && (!systemDark || systemDark.matches));
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#0d0f14" : "#f6f7f9");
-    syncSeg(els.themeSeg, "theme-choice", choice);
+    if (meta) meta.setAttribute("content", dark ? "#08070d" : "#eeeaf6");
+    syncSeg(els.themeSeg, "themeChoice", choice);
   }
 
-  // Si le réglage est « auto », suivre le système quand il bascule.
   if (systemDark && systemDark.addEventListener) {
     systemDark.addEventListener("change", function () {
       if (store.get("mob.theme", "auto") === "auto") applyTheme();
@@ -830,19 +1975,12 @@
     syncSeg(els.sizeSeg, "size", String(px));
   }
 
-  // Un groupe de boutons se comporte comme un choix unique : un seul
-  // aria-pressed à true, qui sert aussi de style d'état sélectionné.
-  function syncSeg(group, attr, value) {
+  function syncSeg(group, key, value) {
     if (!group) return;
     var buttons = group.querySelectorAll("button");
     for (var i = 0; i < buttons.length; i++) {
-      var b = buttons[i];
-      b.setAttribute("aria-pressed", b.dataset[camel(attr)] === value ? "true" : "false");
+      buttons[i].setAttribute("aria-pressed", buttons[i].dataset[key] === value ? "true" : "false");
     }
-  }
-
-  function camel(s) {
-    return s.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
   }
 
   els.themeSeg.addEventListener("click", function (e) {
@@ -850,6 +1988,7 @@
     if (!b) return;
     store.set("mob.theme", b.dataset.themeChoice);
     applyTheme();
+    if (currentView === "home") renderChart();
   });
 
   els.sizeSeg.addEventListener("click", function (e) {
@@ -859,28 +1998,62 @@
     applySize();
   });
 
-  /* ---------- compte ---------- */
+  /* ================= compte et profil ================= */
+
+  function syncProfile() {
+    var name = displayName();
+    var connected = !!store.get("mob.key", "");
+    els.profileName.textContent = name || "Invité";
+    els.profileRole.textContent = !connected ? "Non connecté"
+      : isAdmin() ? "Administrateur" : "Utilisateur";
+    els.avatar.textContent = (name ? name.charAt(0) : "M").toUpperCase();
+    if (currentView === "home") {
+      els.headTitleText.textContent = name ? "Bonjour, " + name : "Bonjour";
+    }
+  }
 
   function syncAccount() {
     var key = store.get("mob.key", "");
     var connected = !!key;
     els.accountState.className = "state" + (connected ? " on" : "");
-    els.accountWho.innerHTML = "";
-    els.accountWho.appendChild(document.createTextNode(connected ? "Connecté" : "Non connecté"));
+    els.accountWho.textContent = connected ? "Connecté" : "Non connecté";
     var small = document.createElement("small");
+    // Ne jamais réafficher la clé : un repère suffit à la reconnaître.
     small.textContent = connected
-      // Ne jamais réafficher la clé, même partiellement masquée : un repère
-      // suffit à reconnaître laquelle est en place.
       ? "Clé ···" + key.slice(-4) + " — retenue sur cet appareil"
       : "Ajoute ta clé pour commencer";
     els.accountWho.appendChild(small);
 
     els.editKey.hidden = !connected;
     els.signOut.hidden = !connected;
-    // Une fois connecté, le champ disparaît : c'est ce qui fait qu'on ne
-    // redemande plus la clé à chaque ouverture des réglages.
+    // Le champ disparaît une fois connecté : c'est ce qui fait qu'on ne
+    // redemande plus la clé à chaque passage dans les réglages.
     els.keyFields.hidden = connected;
+    els.displayNameInput.value = displayName();
+    syncProfile();
   }
+
+  // Enregistrement immédiat : plus de bouton « Enregistrer » global, donc
+  // plus de risque qu'il réécrive la clé depuis un champ vide.
+  els.key.addEventListener("change", function () {
+    var typed = els.key.value.trim();
+    if (!typed) return;
+    store.set("mob.key", typed);
+    els.key.value = "";
+    syncAccount();
+    render();
+    if (pendingQuestion) {
+      var q = pendingQuestion;
+      pendingQuestion = null;
+      unlockSpeech();
+      ask(q);
+    }
+  });
+
+  els.displayNameInput.addEventListener("change", function () {
+    store.set("mob.name", els.displayNameInput.value.trim().slice(0, 24));
+    syncProfile();
+  });
 
   els.editKey.addEventListener("click", function () {
     els.keyFields.hidden = false;
@@ -891,98 +2064,216 @@
   els.signOut.addEventListener("click", function () {
     if (!confirm("Se déconnecter ? La clé et la conversation seront effacées de cet appareil.")) return;
     store.set("mob.key", "");
-    history = [];
-    store.set("mob.history", history);
+    chats = [];
+    saveChats();
+    current = blankChat();
+    history = current.messages;
     syncAccount();
     render();
-    els.settings.close();
+    syncChatBar();
+    show("chat");
   });
 
-  /* ---------- curseurs ---------- */
+  /* ================= voix : réglages ================= */
 
-  function rateLabel(v) {
-    return v < 0.85 ? "lente" : v > 1.15 ? "rapide" : "normale";
+  function syncVoice() {
+    var on = store.get("mob.speak", false);
+    els.voiceToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    els.voiceToggle.textContent = on ? "🔊" : "🔈";
+    els.speakPref.setAttribute("aria-pressed", on ? "true" : "false");
+    els.speakPref.textContent = on ? "Oui" : "Non";
   }
+
+  function toggleVoice() {
+    unlockSpeech();
+    var on = !store.get("mob.speak", false);
+    store.set("mob.speak", on);
+    syncVoice();
+    if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+  }
+
+  els.voiceToggle.addEventListener("click", toggleVoice);
+  els.speakPref.addEventListener("click", toggleVoice);
+
+  function rateLabel(v) { return v < 0.85 ? "lente" : v > 1.15 ? "rapide" : "normale"; }
 
   els.rate.addEventListener("input", function () {
     els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
-  });
-
-  els.ctx.addEventListener("input", function () {
-    els.ctxVal.textContent = els.ctx.value + " messages";
-  });
-
-  /* ---------- ouverture / enregistrement ---------- */
-
-  els.openSettings.addEventListener("click", function () {
-    els.key.value = "";
-    els.model.value = store.get("mob.model", "mistral-small-latest");
-    els.speakPref.checked = store.get("mob.speak", false);
-    els.rate.value = store.get("mob.rate", 1);
-    els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
-    els.ctx.value = contextWindow();
-    els.ctxVal.textContent = els.ctx.value + " messages";
-    syncAccount();
-    applyTheme();
-    applySize();
-    els.settings.showModal();
-  });
-
-  els.closeSettings.addEventListener("click", function () { els.settings.close(); });
-
-  els.settingsForm.addEventListener("submit", function () {
-    // Champ vide alors qu'une clé existe = « je n'y touche pas », sinon
-    // rouvrir les réglages pour changer le thème effacerait la clé.
-    var typed = els.key.value.trim();
-    if (typed) store.set("mob.key", typed);
-
-    store.set("mob.model", els.model.value);
-    store.set("mob.speak", els.speakPref.checked);
     store.set("mob.rate", parseFloat(els.rate.value));
-    store.set("mob.ctx", parseInt(els.ctx.value, 10));
-    syncVoiceButton();
-    syncAccount();
-    render();
-
-    // Une question dictée en attente part maintenant que la clé existe.
-    if (pendingQuestion && store.get("mob.key", "")) {
-      var q = pendingQuestion;
-      pendingQuestion = null;
-      unlockSpeech();
-      ask(q);
-    }
   });
 
   els.clearHistory.addEventListener("click", function () {
-    if (!confirm("Effacer toute la conversation ?")) return;
-    history = [];
-    store.set("mob.history", history);
+    if (!confirm("Effacer la discussion en cours ?")) return;
+    var at = chats.indexOf(current);
+    if (at !== -1) chats.splice(at, 1);
+    saveChats();
+    current = blankChat();
+    history = current.messages;
     render();
-    els.settings.close();
+    syncChatBar();
+    show("chat");
   });
 
-  /* ---------- démarrage ---------- */
+  /* ================= espace admin ================= */
+
+  function syncAdmin() {
+    var on = isAdmin();
+    els.navAdmin.hidden = !on;
+    els.adminBadge.hidden = !on;
+    els.adminUnlock.hidden = on;
+    els.adminLeave.hidden = !on;
+    els.adminSub.textContent = on
+      ? "Mode administrateur actif."
+      : "Réservé au propriétaire de l'instance.";
+    els.navSub.textContent = on ? "Admin" : "Assistant";
+    syncProfile();
+    if (!on && currentView === "admin") show("home");
+  }
+
+  els.adminEnter.addEventListener("click", function () {
+    if (els.adminCodeInput.value !== adminCode()) {
+      els.adminCodeInput.value = "";
+      alert("Code incorrect.");
+      return;
+    }
+    els.adminCodeInput.value = "";
+    store.set("mob.admin", true);
+    syncAdmin();
+    show("admin");
+  });
+
+  els.adminLeave.addEventListener("click", function () {
+    store.set("mob.admin", false);
+    syncAdmin();
+    show("home");
+  });
+
+  els.model.addEventListener("change", function () { store.set("mob.model", els.model.value); });
+
+  els.ctx.addEventListener("input", function () {
+    els.ctxVal.textContent = els.ctx.value + " messages";
+    store.set("mob.ctx", parseInt(els.ctx.value, 10));
+  });
+
+  els.sysPrompt.addEventListener("change", function () {
+    store.set("mob.prompt", els.sysPrompt.value.trim() || DEFAULT_PROMPT);
+  });
+
+  els.resetPrompt.addEventListener("click", function () {
+    store.set("mob.prompt", DEFAULT_PROMPT);
+    els.sysPrompt.value = DEFAULT_PROMPT;
+  });
+
+  els.wipeAll.addEventListener("click", function () {
+    if (!confirm("Tout effacer : clé, conversation et réglages ?")) return;
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf("mob.") === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* rien à faire de plus */ }
+    location.href = location.pathname;
+  });
+
+  function renderAdmin() {
+    els.model.value = store.get("mob.model", "mistral-small-latest");
+    els.ctx.value = contextWindow();
+    els.ctxVal.textContent = els.ctx.value + " messages";
+    els.sysPrompt.value = systemPrompt();
+
+    var t = totals();
+    els.statMsgs.textContent = String(t.msgs);
+    els.statImgs.textContent = String(t.images);
+    els.statSites.textContent = String(t.sites);
+    els.statSize.textContent = humanBytes(storageBytes());
+  }
+
+  /* ================= créations ================= */
+
+  function renderCreations() {
+    els.creations.innerHTML = "";
+    var images = [], sites = [];
+    allMessages().forEach(function (m) {
+      if (m.role !== "assistant") return;
+      var img = m.content.match(/IMAGE\(([^)]+)\)/i);
+      if (img) images.push(img[1].trim());
+      var code = extractHtml(m.content);
+      if (code) sites.push(code);
+    });
+
+    if (!images.length && !sites.length) {
+      var p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "Rien pour l'instant. Demande une image ou une page à Mob, " +
+        "et tu les retrouveras ici.";
+      els.creations.appendChild(p);
+      return;
+    }
+
+    if (images.length) {
+      var grid = document.createElement("div");
+      grid.className = "grid";
+      images.slice(-24).reverse().forEach(function (prompt) {
+        var tile = document.createElement("div");
+        tile.className = "tile";
+        var im = document.createElement("img");
+        im.loading = "lazy"; im.alt = prompt; im.src = imageURL(prompt);
+        tile.appendChild(im);
+        var lab = document.createElement("div");
+        lab.className = "lab"; lab.textContent = prompt;
+        tile.appendChild(lab);
+        grid.appendChild(tile);
+      });
+      els.creations.appendChild(grid);
+    }
+
+    sites.slice(-12).reverse().forEach(function (code) {
+      var wrap = document.createElement("div");
+      wrap.style.marginTop = "14px";
+      var t = document.createElement("div");
+      t.className = "lab";
+      t.textContent = "Page web générée — " + Math.round(code.length / 1024) + " Ko";
+      wrap.appendChild(t);
+      wrap.appendChild(siteBlock(code));
+      els.creations.appendChild(wrap);
+    });
+  }
+
+  /* ================= démarrage ================= */
 
   applyTheme();
   applySize();
-  syncVoiceButton();
+  syncVoice();
+  syncAccount();
+  syncAdmin();
+  els.rate.value = store.get("mob.rate", 1);
+  els.rateVal.textContent = rateLabel(parseFloat(els.rate.value));
   render();
+  syncChatBar();
+
+  // Le graphique dépend de la largeur réelle du panneau : il faut le
+  // redessiner quand elle change, sinon il reste figé à l'ancienne taille.
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (currentView !== "home") return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(renderChart, 150);
+  });
 
   // Question passée dans l'adresse : ?q=... — c'est par là qu'arrive le
   // raccourci Siri, qui dicte puis ouvre Mob avec la question déjà posée.
-  // On la retire de l'URL aussitôt, sinon un simple rechargement de la
-  // page la reposerait indéfiniment.
+  // On la retire de l'URL aussitôt, sinon un rechargement la reposerait.
   var asked = new URLSearchParams(location.search).get("q");
   if (asked) window.history.replaceState(null, "", location.pathname);
 
-  if (!store.get("mob.key", "")) {
-    // Question dictée avant d'avoir configuré la clé : on la garde de côté
-    // au lieu de la perdre, et on la pose dès que la clé est enregistrée.
-    if (asked && asked.trim()) pendingQuestion = asked.trim();
-    els.settings.showModal();
-  } else if (asked && asked.trim()) {
+  if (asked && asked.trim()) {
     unlockSpeech();
-    ask(asked.trim());
+    ask(asked.trim());          // ask() met la question de côté s'il manque la clé
+  } else if (!store.get("mob.key", "")) {
+    show("settings");
+  } else {
+    // Entrer sur le site ouvre une discussion neuve — les précédentes
+    // restent accessibles par l'onglet Historique.
+    show("chat");
   }
 })();
 </script>
