@@ -98,9 +98,32 @@ await check("un thème est appliqué dès le chargement", async () => {
   assert(theme === "dark" || theme === "light", `data-theme = ${theme}`);
 });
 
-await check("sans clé, l'app conduit vers les réglages", async () => {
+await check("le thème sombre est appliqué par défaut", async () => {
+  // La maquette est sombre : ouvrir Mob sur un appareil en mode clair ne
+  // doit pas donner une interface blanche qui ne lui ressemble pas.
+  assert(await page.getAttribute("html", "data-theme") === "dark",
+    `thème par défaut = ${await page.getAttribute("html", "data-theme")}`);
+});
+
+await check("sans clé, l'app ouvre la conversation — jamais les réglages", async () => {
+  assert(await page.locator("#view-chat.active").count() === 1,
+    "le lancement devrait ouvrir la conversation");
+  assert(await page.locator("#view-settings.active").count() === 0,
+    "le lancement atterrit encore sur les réglages");
+  assert(await page.locator("#keyBanner").isVisible(),
+    "rien n'invite à ajouter la clé");
+});
+
+await check("le bandeau mène aux réglages et disparaît une fois la clé mise", async () => {
+  await page.click("#addKey");
   assert(await page.locator("#view-settings.active").count() === 1,
-    "la vue Réglages devrait être ouverte au premier lancement");
+    "« Ajouter ma clé » n'ouvre pas les réglages");
+  await setKey("cle-de-test-bandeau");
+  await go("chat");
+  assert(await page.locator("#keyBanner").isHidden(), "le bandeau reste affiché une fois connecté");
+  // On repart sans clé : les contrôles suivants vérifient l'état déconnecté.
+  await page.evaluate(() => localStorage.removeItem("mob.key"));
+  await page.reload({ waitUntil: "domcontentloaded" });
 });
 
 /* ------------------------------------------------------------------ */
@@ -221,14 +244,16 @@ await check("le bouton de la carte en dégradé ouvre la conversation", async ()
 group("en-tête");
 
 await check("la barre « Demande à Mob » pose bien la question", async () => {
-  // Sans clé, la question est mise de côté et les réglages s'ouvrent :
-  // c'est l'effet attendu, et il se vérifie sans appel réseau.
+  // Sans clé, la question est mise de côté et la conversation s'ouvre
+  // avec son bandeau : l'effet se vérifie sans appel réseau.
   await page.evaluate(() => localStorage.removeItem("mob.key"));
+  await page.reload({ waitUntil: "domcontentloaded" });
   await go("home");
   await page.fill("#ask", "une question depuis l'en-tête");
   await page.locator("#ask").press("Enter");
-  assert(await page.locator("#view-settings.active").count() === 1,
-    "la question de l'en-tête n'a pas été prise en compte");
+  assert(await page.locator("#view-chat.active").count() === 1,
+    "la question de l'en-tête n'a pas ouvert la conversation");
+  assert(await page.locator("#keyBanner").isVisible(), "le bandeau de clé manque");
 });
 
 await check("la cloche ouvre puis referme les notifications", async () => {
@@ -549,7 +574,8 @@ await check("une clé invalide donne un message lisible, pas un plantage", async
 await check("une question dictée avant la clé n'est pas perdue", async () => {
   await page.evaluate(() => { localStorage.removeItem("mob.key"); localStorage.removeItem("mob.history"); });
   await page.goto(`${URL_BASE}?q=question%20avant%20la%20cle`, { waitUntil: "domcontentloaded" });
-  assert(await page.locator("#view-settings.active").count() === 1, "les réglages auraient dû s'ouvrir");
+  assert(await page.locator("#view-chat.active").count() === 1, "la conversation aurait dû s'ouvrir");
+  assert(await page.locator("#keyBanner").isVisible(), "le bandeau de clé manque");
   await setKey("cle-de-test");
   await page.waitForSelector(".msg.user", { timeout: 15000 });
   assert((await page.textContent(".msg.user")).includes("question avant la cle"), "question perdue");
