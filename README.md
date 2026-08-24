@@ -48,10 +48,19 @@ prix de gros détours :
   l'image par simple URL, donc une balise `<img>` suffit. Contrepartie :
   environ une image toutes les 15 secondes, et le service peut être
   saturé — l'échec est alors affiché, pas silencieux.
-- **Génère des sites web** — demande une page, Mob écrit un document HTML
-  complet et autonome, puis propose **Aperçu**, **Enregistrer** et
-  **Copier le code**. Le code est retiré de la bulle pour rester lisible
-  sur téléphone ; il reste entier derrière les boutons.
+- **Écrit du code, dans n'importe quel langage** — Python, JavaScript,
+  Swift, SQL, shell… Chaque fichier arrive dans sa propre carte, avec son
+  nom, son langage et de quoi le **copier** ou l'**enregistrer** avec la
+  bonne extension. Le code sort de la bulle pour qu'elle reste lisible sur
+  téléphone ; il reste entier dans sa zone défilante.
+- **Plusieurs fichiers d'un coup** — une réponse peut livrer un projet
+  entier (`index.html` + `style.css` + `script.js`, ou un module Python en
+  trois fichiers). Un bouton **Tout (.zip)** les emporte en une archive,
+  écrite par la page elle-même sans aucune bibliothèque.
+- **Aperçu immédiat d'une page web** — quand la réponse contient un
+  fichier HTML, **Aperçu** l'ouvre en réinjectant au passage les feuilles
+  de style et les scripts voisins, qui n'existent pas encore sur le
+  disque.
 
 ### Déclenchement vocal : « Dis Siri, Mob »
 
@@ -128,7 +137,7 @@ de l'app, ce sont deux emplacements séparés par le système.
 `tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
 en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
 survit-elle à un rechargement — plutôt que la présence des éléments
-dans le HTML. 80 contrôles, plus 13 sur le relais.
+dans le HTML. 86 contrôles, plus 13 sur le relais.
 
 `.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
 sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull

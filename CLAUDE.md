@@ -197,6 +197,44 @@ Morale, à garder : **les contrôles au navigateur ne remplacent pas un
 coup d'œil aux captures.** 57 contrôles passaient au vert pendant que
 trois éléments étaient visiblement cassés.
 
+## Mob écrit du code — ce qui a été appris en le construisant
+
+Mob ne rendait qu'une page HTML ; il livre maintenant **n'importe quel
+langage, en autant de fichiers qu'il faut**. `extractCode()` repère tous
+les blocs délimités, la ligne d'ouverture pouvant porter
+`langage:chemin/fichier.ext`. Chaque fichier devient une carte avec son
+nom, son langage, une zone de code défilante et ses boutons ; plusieurs
+fichiers ajoutent **Tout (.zip)** et, s'il y a du HTML, un **Aperçu**.
+
+Trois choses à ne pas défaire :
+
+- **`zipFiles()` écrit l'archive à la main**, en « stored » (sans
+  compression) : en-tête local, répertoire central, pied d'archive. C'est
+  ~60 lignes et ça évite une bibliothèque dans une page qui n'en a aucune.
+  Vérifié pour de vrai : le navigateur produit le fichier, `unzip -t`
+  valide les CRC, les accents survivent. Le contrôle permanent relit la
+  signature et le nombre d'entrées dans le pied d'archive.
+- **`assemble()` réinjecte les fichiers voisins avant l'aperçu.** Un
+  `<link href="style.css">` pointe vers un fichier qui n'existe nulle
+  part : sans cette étape, l'aperçu s'ouvre en noir et blanc et on croit
+  que le modèle a mal travaillé.
+- **`</script>` écrit tel quel dans une chaîne JavaScript referme la
+  balise de la page.** Ça a cassé toute l'app d'un coup, et `node --check`
+  sur le script extrait ne le voyait pas — c'est l'analyseur HTML qui
+  tranche, pas celui de JavaScript. Écris `<\/script>`.
+
+Deux pièges rencontrés dans les tests, à connaître :
+
+- **`button:has-text("Aperçu")` attrape aussi l'onglet « Aperçu » du
+  tableau de bord**, invisible, et Playwright attend 30 s dessus. Vise
+  `#messages button:has-text(...)`.
+- **Le Durable Object garde son état entre deux exécutions locales**
+  (`worker/.wrangler/`), donc un contrôle de plafond ne passait qu'une
+  fois. Les codes de test portent maintenant un suffixe tiré au sort, et
+  le port de `wrangler dev` aussi — un wrangler resté vivant d'une
+  exécution précédente répondait sinon à sa place, avec l'ancienne
+  configuration.
+
 ## Le relais — la seule réponse au « une clé pour tout le monde »
 
 L'utilisateur a demandé trois fois la même chose sous trois formes : une
