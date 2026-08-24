@@ -261,6 +261,15 @@ L'icône (`docs/icon.png`) est régénérée par `python3 tools/make-icon.py`
 changes la palette, relance-le : une icône jaune sur une app violette,
 c'est le genre de détail qui se remarque sur l'écran d'accueil.
 
+**Le rouge qui n'en est pas un** : juste après une fusion, le CDN de
+GitHub Pages sert encore l'ancienne page pendant une minute ou deux. La
+suite échouait alors sur des éléments absents de *cette* version — six
+contrôles rouges, aucun défaut réel. Le workflow attend maintenant que la
+page servie ait la même empreinte que `docs/index.html` avant de juger.
+Si tu vois ce motif (des « introuvable » groupés en début de suite, le
+reste au vert), c'est le déploiement, pas le code : relance plutôt que de
+« corriger » quelque chose qui marche.
+
 `.github/workflows/health-check.yml` lance la même suite **toutes les
 3 heures** sur le site en ligne, plus à chaque poussée sur `main` et sur
 chaque pull request (là, contre la copie du dépôt, le site en ligne
