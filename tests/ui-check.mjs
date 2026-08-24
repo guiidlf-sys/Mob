@@ -38,6 +38,7 @@ const browser = await chromium.launch(
   process.env.MOB_CHROMIUM ? { executablePath: process.env.MOB_CHROMIUM } : {}
 );
 const context = await browser.newContext({
+  acceptDownloads: true,                        // le .zip se vérifie pour de vrai
   viewport: { width: 402, height: 874 },        // iPhone 17 Pro, en gros
   userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) " +
              "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile Safari/604.1",
@@ -513,6 +514,109 @@ await check("les images et pages générées sont regroupées", async () => {
   assert(await page.locator("#creations .tile img").count() >= 1, "aucune image dans la galerie");
   assert(await page.locator("#creations .gen-actions button").count() >= 3,
     "les boutons d'une page générée manquent");
+});
+
+/* ------------------------------------------------------------------ */
+group("code livré par Mob");
+
+const REPONSE_CODE = [
+  "Voici le jeu, en trois fichiers.",
+  "",
+  "```html:index.html",
+  '<!doctype html><html lang="fr"><head><meta charset="utf-8">',
+  '<link rel="stylesheet" href="style.css"></head>',
+  "<body><h1>Bonjour</h1><scr" + "ipt src=\"jeu.js\"></scr" + "ipt></body></html>",
+  "```",
+  "",
+  "```css:style.css",
+  "body { background: #101010; color: #eee }",
+  "```",
+  "",
+  "```javascript:jeu.js",
+  'document.title = "accents é à ù";',
+  "```",
+].join("\n");
+
+/** Les boutons d'un message : « Aperçu » nomme aussi un onglet du tableau
+ *  de bord, alors on reste dans la conversation. */
+const boutonDuMessage = (libelle) => page.locator(`#messages button:has-text("${libelle}")`);
+
+const ouvrirReponse = async (contenu) => {
+  await seedChats([chat([
+    { role: "user", content: "code stp", ts: Date.now() },
+    { role: "assistant", content: contenu, ts: Date.now() },
+  ], "Demande de code")]);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await go("historique");
+  await page.click("#histList .hist-open");
+  await page.waitForSelector(".file", { timeout: 5000 });
+};
+
+await check("chaque fichier a sa carte, son nom et son langage", async () => {
+  await ouvrirReponse(REPONSE_CODE);
+  assert(await page.locator(".file").count() === 3,
+    `${await page.locator(".file").count()} carte(s) au lieu de 3`);
+  const noms = await page.locator(".file-head b").allTextContents();
+  assert(noms.join(",") === "index.html,style.css,jeu.js", `noms : ${noms.join(",")}`);
+  const langs = await page.locator(".file-head .lang").allTextContents();
+  assert(langs.includes("javascript"), `langages : ${langs.join(",")}`);
+});
+
+await check("le code sort de la bulle au lieu de la noyer", async () => {
+  const bulle = await page.evaluate(() => {
+    const d = document.querySelector(".msg.bot > div");
+    return d ? d.textContent : "";
+  });
+  assert(bulle.includes("Voici le jeu"), `texte perdu : « ${bulle} »`);
+  assert(!bulle.includes("doctype"), "le code est resté dans le texte de la bulle");
+  assert(!bulle.includes("```"), "les délimiteurs sont restés visibles");
+});
+
+await check("un fichier sans nom reçoit une extension correcte", async () => {
+  await ouvrirReponse("Un script.\n\n```python\nprint('salut')\n```");
+  assert((await page.textContent(".file-head b")) === "fichier1.py",
+    `nom attribué : ${await page.textContent(".file-head b")}`);
+});
+
+await check("un seul fichier n'a pas de bouton d'archive", async () => {
+  assert(await boutonDuMessage("Tout (.zip)").count() === 0,
+    "l'archive est proposée pour un fichier unique");
+  assert(await page.locator('.file button:has-text("Enregistrer")').count() === 1,
+    "le bouton d'enregistrement manque");
+});
+
+await check("« Tout (.zip) » produit une archive ZIP réellement valide", async () => {
+  await ouvrirReponse(REPONSE_CODE);
+  const [dl] = await Promise.all([
+    page.waitForEvent("download", { timeout: 15000 }),
+    boutonDuMessage("Tout (.zip)").click(),
+  ]);
+  const flux = await dl.createReadStream();
+  const morceaux = [];
+  for await (const c of flux) morceaux.push(c);
+  const octets = Buffer.concat(morceaux);
+
+  // Signature d'en-tête local, puis lecture du pied d'archive : c'est là
+  // que se trouve le nombre d'entrées, donc c'est ce qui prouve la structure.
+  assert(octets.subarray(0, 4).toString("hex") === "504b0304", "ce n'est pas une archive ZIP");
+  const fin = octets.lastIndexOf(Buffer.from("504b0506", "hex"));
+  assert(fin > 0, "pied d'archive introuvable");
+  assert(octets.readUInt16LE(fin + 10) === 3, `${octets.readUInt16LE(fin + 10)} entrées au lieu de 3`);
+  assert(octets.includes("jeu.js") && octets.includes("accents é à ù"),
+    "le contenu ou les accents ne sont pas dans l'archive");
+});
+
+await check("l'aperçu réinjecte les fichiers voisins dans la page", async () => {
+  const [onglet] = await Promise.all([
+    context.waitForEvent("page", { timeout: 10000 }),
+    boutonDuMessage("Aperçu").click(),
+  ]);
+  await onglet.waitForLoadState("domcontentloaded");
+  const html = await onglet.content();
+  assert(html.includes("#101010"), "la feuille de style n'a pas été réinjectée");
+  assert(html.includes("accents"), "le script n'a pas été réinjecté");
+  assert(!/href=["']?style\.css/.test(html), "le lien vers un fichier absent subsiste");
+  await onglet.close();
 });
 
 /* ------------------------------------------------------------------ */

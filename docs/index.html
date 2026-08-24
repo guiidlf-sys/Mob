@@ -377,6 +377,33 @@
   .gen img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; display: block; background: var(--surface-2); }
   .gen .cap { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
   .gen-fail { margin-top: 11px; font-size: 13px; color: var(--danger); }
+  /* Un fichier de code livré par Mob. Le code est enfermé dans sa propre
+     zone défilante : une réponse de 400 lignes ne doit pas repousser le
+     composeur hors de l'écran. */
+  .file {
+    margin-top: 11px; border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; background: var(--surface-2);
+  }
+  .file-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .file-head b {
+    flex: 1; min-width: 0; font-size: 12.5px; font-weight: 620;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-head .lang {
+    flex-shrink: 0; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 8px;
+  }
+  .file pre {
+    margin: 0; padding: 12px; max-height: 320px; overflow: auto;
+    font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre; -webkit-overflow-scrolling: touch;
+  }
+  .file pre code { white-space: pre; }
+  .file .gen-actions { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); }
+
   .gen-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .gen-actions button {
     padding: 9px 13px; border-radius: 11px; font: inherit; font-size: 13.5px;
@@ -874,7 +901,7 @@
           <div class="stats">
             <div class="stat"><b id="statMsgs">0</b><small>messages gardés</small></div>
             <div class="stat"><b id="statImgs">0</b><small>images générées</small></div>
-            <div class="stat"><b id="statSites">0</b><small>pages générées</small></div>
+            <div class="stat"><b id="statSites">0</b><small>réponses avec du code</small></div>
             <div class="stat"><b id="statSize">0 o</b><small>stockage utilisé</small></div>
           </div>
         </div>
@@ -963,14 +990,28 @@
     "de façon directe et utile. Sois bref quand la question est simple ; " +
     "développe autant qu'il le faut quand c'est justifié — code, raisonnement " +
     "technique, explication de fond. Évite les formules de politesse creuses.\n\n" +
-    "Deux capacités particulières :\n" +
+    "Deux capacités particulières :\n\n" +
     "1. IMAGE — si on te demande de générer, dessiner ou créer une image, " +
     "réponds par une courte phrase puis, sur une ligne seule, " +
     "IMAGE(description détaillée en anglais). La description anglaise part " +
-    "telle quelle au générateur : sois précis et visuel.\n" +
-    "2. SITE WEB — si on te demande un site, une page ou une interface, donne " +
-    "un document HTML complet et autonome dans un bloc ```html, styles et " +
-    "scripts compris. Pas de fichiers séparés, pas de dépendances externes.";
+    "telle quelle au générateur : sois précis et visuel.\n\n" +
+    "2. CODE — quand on te demande du code, dans n'importe quel langage, " +
+    "livre-le en blocs délimités dont la ligne d'ouverture porte le langage " +
+    "et le nom du fichier, séparés par deux-points :\n" +
+    "```python:analyse.py\n" +
+    "…\n" +
+    "```\n" +
+    "Un bloc par fichier, autant de blocs que nécessaire. Règles :\n" +
+    "- du code **complet et exécutable**, jamais de « ... » ni de " +
+    "« à compléter » ni de fonction laissée vide ;\n" +
+    "- privilégie la bibliothèque standard du langage ; si une dépendance " +
+    "est indispensable, dis en une phrase comment l'installer ;\n" +
+    "- pour une page web, un fichier HTML autonome suffit le plus souvent, " +
+    "mais tu peux séparer en .html/.css/.js si c'est plus clair ;\n" +
+    "- explique brièvement AVANT les blocs — ce qui suit un bloc a peu de " +
+    "chances d'être lu ;\n" +
+    "- si la demande est ambiguë, choisis l'interprétation la plus utile, " +
+    "livre le code, et signale ton hypothèse en une ligne.";
 
   var store = {
     get: function (k, fallback) {
@@ -1193,7 +1234,9 @@
   var isUser = function (m) { return m.role === "user"; };
   var isBot = function (m) { return m.role === "assistant"; };
   var isImage = function (m) { return m.role === "assistant" && /IMAGE\([^)]+\)/i.test(m.content); };
-  var isSite = function (m) { return m.role === "assistant" && !!extractHtml(m.content); };
+  var isSite = function (m) {
+    return m.role === "assistant" && extractCode(m.content).files.length > 0;
+  };
   var any = function () { return true; };
 
   function deltaBadge(cur, prev) {
@@ -1248,7 +1291,7 @@
     { ic: "🙋", name: "Questions posées", sub: "tes messages", test: isUser },
     { ic: "🤖", name: "Réponses de Mob", sub: "messages du modèle", test: isBot },
     { ic: "🖼", name: "Images générées", sub: "via Pollinations", test: isImage },
-    { ic: "🧾", name: "Pages générées", sub: "documents HTML", test: isSite }
+    { ic: "🧾", name: "Fichiers de code", sub: "tous langages", test: isSite }
   ];
 
   function renderWatchlist(pool, curFrom, prevFrom, now) {
@@ -1310,7 +1353,7 @@
       { ic: "🕘", v: String(t.chats), k: "discussions" },
       { ic: "💬", v: String(t.msgs), k: "messages conservés" },
       { ic: "🖼", v: String(t.images), k: "images" },
-      { ic: "🧾", v: String(t.sites), k: "pages web" }
+      { ic: "🧾", v: String(t.sites), k: "réponses avec du code" }
     ];
     els.metrics.innerHTML = "";
     tiles.forEach(function (m) {
@@ -1574,7 +1617,7 @@
 
   var SUGGESTIONS = [
     "Génère une image de robot violet",
-    "Programme-moi une page de compteur",
+    "Écris-moi un script Python qui trie mes photos",
     "Explique-moi les trous noirs"
   ];
 
@@ -1643,9 +1686,10 @@
     var image = text.match(/IMAGE\(([^)]+)\)/i);
     if (image) text = text.replace(image[0], "").trim();
 
-    var code = extractHtml(text);
-    // Un document HTML entier dans une bulle est illisible sur téléphone.
-    if (code) text = text.replace(/```(?:html)?\s*\n[\s\S]*?```/i, "").trim();
+    // Les fichiers sortent de la bulle : un fichier entier au fil du texte
+    // est illisible sur téléphone.
+    var found = extractCode(text);
+    text = found.text;
 
     if (text) {
       var body = document.createElement("div");
@@ -1653,14 +1697,86 @@
       d.appendChild(body);
     }
     if (image) d.appendChild(imageBlock(image[1].trim()));
-    if (code) d.appendChild(siteBlock(code));
+    if (found.files.length) d.appendChild(filesBlock(found.files));
     return d;
   }
 
-  function extractHtml(text) {
-    var m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
-    if (m && /<!doctype|<html|<body|<div|<h1|<style/i.test(m[1])) return m[1].trim();
+  // Le langage donne l'extension quand le modèle n'a pas nommé le fichier.
+  var LANGS = {
+    html: "html", htm: "html", css: "css", js: "js", javascript: "js",
+    jsx: "jsx", ts: "ts", typescript: "ts", tsx: "tsx", json: "json",
+    py: "py", python: "py", rb: "rb", ruby: "rb", php: "php", go: "go",
+    rs: "rs", rust: "rs", java: "java", kt: "kt", kotlin: "kt",
+    swift: "swift", c: "c", h: "h", cpp: "cpp", "c++": "cpp", cs: "cs",
+    sh: "sh", bash: "sh", zsh: "sh", sql: "sql", yaml: "yml", yml: "yml",
+    toml: "toml", xml: "xml", md: "md", markdown: "md", txt: "txt",
+    dockerfile: "Dockerfile", makefile: "Makefile"
+  };
+
+  var MIMES = {
+    html: "text/html", css: "text/css", js: "text/javascript",
+    json: "application/json", md: "text/markdown", xml: "application/xml"
+  };
+
+  /**
+   * Repère tous les blocs de code d'une réponse. La ligne d'ouverture peut
+   * porter « langage:chemin/fichier.ext », « langage » seul, ou rien.
+   * Renvoie la liste des fichiers et le texte débarrassé des blocs — un
+   * fichier entier dans une bulle est illisible sur téléphone.
+   */
+  function extractCode(text) {
+    var files = [];
+    var reste = String(text).replace(/```([^\n`]*)\r?\n([\s\S]*?)```/g,
+      function (bloc, info, corps) {
+        var code = corps.replace(/\s+$/, "");
+        if (!code.trim()) return "";
+
+        var parts = String(info).trim().split(":");
+        var lang = (parts[0] || "").trim().toLowerCase();
+        var nom = parts.slice(1).join(":").trim();
+
+        var ext = LANGS[lang] || (lang && /^[a-z0-9+#]{1,12}$/.test(lang) ? lang : "txt");
+        if (!nom) nom = "fichier" + (files.length + 1) +
+          (ext === "Dockerfile" || ext === "Makefile" ? "" : "." + ext);
+
+        files.push({ name: nom, lang: lang || ext, ext: ext, code: code });
+        return "";
+      });
+
+    return { files: files, text: reste.replace(/\n{3,}/g, "\n\n").trim() };
+  }
+
+  /** Y a-t-il de quoi ouvrir un aperçu ? Il faut un fichier HTML. */
+  function htmlAmong(files) {
+    for (var i = 0; i < files.length; i++) {
+      if (/\.html?$/i.test(files[i].name) || files[i].ext === "html") return files[i];
+    }
     return null;
+  }
+
+  /**
+   * Aperçu d'un ensemble de fichiers : les feuilles de style et les scripts
+   * voisins sont réinjectés dans la page, sinon le navigateur les cherche
+   * sur un disque où ils ne sont pas.
+   */
+  function assemble(files) {
+    var page = htmlAmong(files);
+    if (!page) return null;
+    var out = page.code;
+    files.forEach(function (f) {
+      if (f === page) return;
+      var nom = f.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (f.ext === "css") {
+        out = out.replace(new RegExp('<link[^>]*href=["\']?[^"\'>]*' + nom + '["\']?[^>]*>', "gi"),
+          "<style>\n" + f.code + "\n</style>");
+      } else if (f.ext === "js") {
+        // « <\/script> » plutôt que la forme littérale : écrite telle quelle
+        // dans une chaîne, elle refermerait la balise de cette page.
+        out = out.replace(new RegExp('<script[^>]*src=["\']?[^"\'>]*' + nom + '["\']?[^>]*>\\s*<\\/script>', "gi"),
+          "<script>\n" + f.code + "\n<\/script>");
+      }
+    });
+    return out;
   }
 
   // Graine dérivée du texte : la même description redonne la même image,
@@ -1693,34 +1809,160 @@
     return wrap;
   }
 
-  function siteBlock(code) {
-    var wrap = document.createElement("div");
-    wrap.className = "gen-actions";
-    function button(label, fn) {
-      var b = document.createElement("button");
-      b.type = "button"; b.textContent = label;
-      b.addEventListener("click", fn);
-      wrap.appendChild(b);
-      return b;
+  /**
+   * Écrit une archive ZIP à la main, en « stored » (sans compression) : le
+   * format tient en trois structures, et ça évite d'embarquer une
+   * bibliothèque dans une page qui n'en a aucune.
+   */
+  var CRC_TABLE = null;
+  function crc32(bytes) {
+    if (!CRC_TABLE) {
+      CRC_TABLE = new Int32Array(256);
+      for (var n = 0; n < 256; n++) {
+        var c = n;
+        for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+        CRC_TABLE[n] = c;
+      }
     }
-    button("👁 Aperçu", function () {
-      var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
-      window.open(url, "_blank");
-      setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    var crc = -1;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
+    }
+    return (crc ^ -1) >>> 0;
+  }
+
+  function zipFiles(files) {
+    var enc = new TextEncoder();
+    var morceaux = [], central = [], offset = 0, total = 0;
+
+    files.forEach(function (f) {
+      var nom = enc.encode(f.name);
+      var data = enc.encode(f.code);
+      var crc = crc32(data);
+
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);        // version minimale
+      local.setUint16(6, 0x0800, true);    // noms en UTF-8
+      local.setUint16(8, 0, true);         // méthode : stocké
+      local.setUint32(14, crc, true);
+      local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true);
+      local.setUint16(26, nom.length, true);
+      morceaux.push(new Uint8Array(local.buffer), nom, data);
+
+      var cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true);
+      cd.setUint16(4, 20, true);
+      cd.setUint16(6, 20, true);
+      cd.setUint16(8, 0x0800, true);
+      cd.setUint16(10, 0, true);
+      cd.setUint32(16, crc, true);
+      cd.setUint32(20, data.length, true);
+      cd.setUint32(24, data.length, true);
+      cd.setUint16(28, nom.length, true);
+      cd.setUint32(42, offset, true);      // où commence l'en-tête local
+      central.push(new Uint8Array(cd.buffer), nom);
+
+      offset += 30 + nom.length + data.length;
+      total += 46 + nom.length;
     });
-    button("⬇ Enregistrer", function () {
-      var url = URL.createObjectURL(new Blob([code], { type: "text/html" }));
-      var a = document.createElement("a");
-      a.href = url; a.download = "site.html"; a.click();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+
+    var fin = new DataView(new ArrayBuffer(22));
+    fin.setUint32(0, 0x06054b50, true);
+    fin.setUint16(8, files.length, true);
+    fin.setUint16(10, files.length, true);
+    fin.setUint32(12, total, true);
+    fin.setUint32(16, offset, true);
+
+    return new Blob(morceaux.concat(central, [new Uint8Array(fin.buffer)]),
+      { type: "application/zip" });
+  }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+  }
+
+  function actionButton(into, label, fn) {
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    b.addEventListener("click", function () { fn(b); });
+    into.appendChild(b);
+    return b;
+  }
+
+  function copyTo(b, texte, libelle) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(texte).then(function () {
+      b.textContent = "✓ Copié";
+      setTimeout(function () { b.textContent = libelle; }, 1600);
     });
-    var copy = button("⧉ Copier le code", function () {
-      if (!navigator.clipboard) return;
-      navigator.clipboard.writeText(code).then(function () {
-        copy.textContent = "✓ Copié";
-        setTimeout(function () { copy.textContent = "⧉ Copier le code"; }, 1600);
+  }
+
+  /** Un fichier : son nom, son langage, son code, et de quoi l'emporter. */
+  function fileCard(f) {
+    var card = document.createElement("div");
+    card.className = "file";
+
+    var head = document.createElement("div");
+    head.className = "file-head";
+    var nom = document.createElement("b");
+    nom.textContent = f.name;
+    var lang = document.createElement("span");
+    lang.className = "lang"; lang.textContent = f.lang;
+    head.appendChild(nom); head.appendChild(lang);
+    card.appendChild(head);
+
+    var pre = document.createElement("pre");
+    var code = document.createElement("code");
+    code.textContent = f.code;         // jamais innerHTML : c'est du texte du modèle
+    pre.appendChild(code);
+    card.appendChild(pre);
+
+    var actions = document.createElement("div");
+    actions.className = "gen-actions";
+    actionButton(actions, "⧉ Copier", function (b) { copyTo(b, f.code, "⧉ Copier"); });
+    actionButton(actions, "⬇ Enregistrer", function () {
+      download(new Blob([f.code], { type: (MIMES[f.ext] || "text/plain") + ";charset=utf-8" }), f.name);
+    });
+    card.appendChild(actions);
+    return card;
+  }
+
+  /** L'ensemble livré par une réponse : chaque fichier, puis les actions groupées. */
+  function filesBlock(files) {
+    var wrap = document.createElement("div");
+    files.forEach(function (f) { wrap.appendChild(fileCard(f)); });
+
+    var page = htmlAmong(files);
+    if (!page && files.length < 2) return wrap;
+
+    var actions = document.createElement("div");
+    actions.className = "gen-actions";
+    if (page) {
+      actionButton(actions, "👁 Aperçu", function () {
+        var url = URL.createObjectURL(new Blob([assemble(files)], { type: "text/html" }));
+        window.open(url, "_blank");
+        setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
       });
-    });
+    }
+    if (files.length > 1) {
+      actionButton(actions, "⬇ Tout (.zip)", function () {
+        download(zipFiles(files), "mob-" + files.length + "-fichiers.zip");
+      });
+      actionButton(actions, "⧉ Copier tout", function (b) {
+        copyTo(b, files.map(function (f) {
+          return "// " + f.name + "\n" + f.code;
+        }).join("\n\n"), "⧉ Copier tout");
+      });
+    }
+    wrap.appendChild(actions);
     return wrap;
   }
 
@@ -2378,19 +2620,19 @@
 
   function renderCreations() {
     els.creations.innerHTML = "";
-    var images = [], sites = [];
+    var images = [], lots = [];
     allMessages().forEach(function (m) {
       if (m.role !== "assistant") return;
       var img = m.content.match(/IMAGE\(([^)]+)\)/i);
       if (img) images.push(img[1].trim());
-      var code = extractHtml(m.content);
-      if (code) sites.push(code);
+      var found = extractCode(m.content);
+      if (found.files.length) lots.push(found.files);
     });
 
-    if (!images.length && !sites.length) {
+    if (!images.length && !lots.length) {
       var p = document.createElement("p");
       p.className = "note";
-      p.textContent = "Rien pour l'instant. Demande une image ou une page à Mob, " +
+      p.textContent = "Rien pour l'instant. Demande une image ou du code à Mob, " +
         "et tu les retrouveras ici.";
       els.creations.appendChild(p);
       return;
@@ -2413,14 +2655,17 @@
       els.creations.appendChild(grid);
     }
 
-    sites.slice(-12).reverse().forEach(function (code) {
+    lots.slice(-12).reverse().forEach(function (files) {
+      var poids = files.reduce(function (n, f) { return n + f.code.length; }, 0);
       var wrap = document.createElement("div");
       wrap.style.marginTop = "14px";
       var t = document.createElement("div");
       t.className = "lab";
-      t.textContent = "Page web générée — " + Math.round(code.length / 1024) + " Ko";
+      t.textContent = files.length + " fichier" + (files.length > 1 ? "s" : "") +
+        " — " + files.map(function (f) { return f.name; }).join(", ") +
+        " · " + (poids > 1024 ? (poids / 1024).toFixed(1) + " Ko" : poids + " o");
       wrap.appendChild(t);
-      wrap.appendChild(siteBlock(code));
+      wrap.appendChild(filesBlock(files));
       els.creations.appendChild(wrap);
     });
   }
