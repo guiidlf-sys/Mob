@@ -62,6 +62,27 @@ jobs:
             echo "quoi=le site en ligne" >> "$GITHUB_OUTPUT"
           fi
 
+      # Après une fusion, le CDN de Pages sert encore l'ancienne page pendant
+      # une minute ou deux : les contrôles échouaient alors sur des éléments
+      # qui n'existaient pas dans cette version-là. On attend que la page
+      # servie corresponde à celle du dépôt avant de juger quoi que ce soit.
+      - name: Attendre que le déploiement soit servi
+        if: github.event_name == 'push'
+        run: |
+          attendu=$(sha256sum docs/index.html | cut -d' ' -f1)
+          for i in $(seq 1 20); do
+            servi=$(curl -fsSL -H 'Cache-Control: no-cache' \
+              "${{ steps.cible.outputs.url }}?cachebust=$RANDOM" | sha256sum | cut -d' ' -f1)
+            if [ "$servi" = "$attendu" ]; then
+              echo "Version déployée après ${i} tentative(s)."
+              exit 0
+            fi
+            sleep 15
+          done
+          # On ne fait pas échouer l'étape : si la page servie diffère
+          # toujours, les contrôles doivent le dire eux-mêmes.
+          echo "::warning::La page servie diffère encore du dépôt après 5 minutes."
+
       - name: Vérifier ${{ steps.cible.outputs.quoi }}
         run: node tests/ui-check.mjs "${{ steps.cible.outputs.url }}"
 
