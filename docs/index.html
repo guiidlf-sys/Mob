@@ -384,6 +384,11 @@
   }
 
   .empty { margin: auto; text-align: center; color: var(--muted); padding: 30px 20px; }
+  /* Le fantôme de Mob. Il prend la couleur de son support, donc le même
+     tracé sert pour la pastille de la barre latérale, l'écran d'accueil de
+     la conversation et l'avatar sans nom. */
+  .ghost { display: block; width: auto; height: 66%; fill: currentColor; }
+
   .empty .big {
     width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 21px;
     background: linear-gradient(140deg, var(--accent-2), var(--accent));
@@ -914,7 +919,7 @@
 
   <nav id="nav">
     <div class="nav-brand">
-      <div class="mark">M</div>
+      <div class="mark"><svg class="ghost" viewBox="0 0 92 118" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M0 46A46 46 0 0 1 92 46V96Q76.67 137.6 61.33 100.84Q46 135.2 30.67 100.84Q15.33 137.6 0 96ZM19 42a9 11.5 0 1 0 18 0 9 11.5 0 1 0-18 0ZM55 42a9 11.5 0 1 0 18 0 9 11.5 0 1 0-18 0ZM39.5 68a6.5 8.5 0 1 0 13 0 6.5 8.5 0 1 0-13 0Z"/></svg></div>
       <div><b>Mob</b><small id="navSub">Assistant</small></div>
     </div>
     <div class="nav-main">
@@ -947,6 +952,11 @@
   var RELAY_URL = "";
   var IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
   var DRAWN_MESSAGES = 60;
+
+  // Le tracé du fantôme, écrit une fois et posé partout où Mob se signe.
+  // innerHTML n'accueille que cette constante — jamais du texte venu du
+  // modèle ou de l'utilisateur, qui passe toujours par textContent.
+  var GHOST = '<svg class="ghost" viewBox="0 0 92 118" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M0 46A46 46 0 0 1 92 46V96Q76.67 137.6 61.33 100.84Q46 135.2 30.67 100.84Q15.33 137.6 0 96ZM19 42a9 11.5 0 1 0 18 0 9 11.5 0 1 0-18 0ZM55 42a9 11.5 0 1 0 18 0 9 11.5 0 1 0-18 0ZM39.5 68a6.5 8.5 0 1 0 13 0 6.5 8.5 0 1 0-13 0Z"/></svg>';
 
   var DEFAULT_PROMPT =
     "Tu es Mob, l'assistant personnel de l'utilisateur. Réponds en français, " +
@@ -1575,7 +1585,8 @@
       var empty = document.createElement("div");
       empty.className = "empty";
       var big = document.createElement("div");
-      big.className = "big"; big.textContent = "M";
+      big.className = "big";
+      big.innerHTML = GHOST;
       empty.appendChild(big);
       var strong = document.createElement("strong");
       strong.textContent = "Mob est prêt.";
@@ -2109,7 +2120,8 @@
     els.profileName.textContent = name || "Invité";
     els.profileRole.textContent = !connected ? "Non connecté"
       : isAdmin() ? "Administrateur" : "Utilisateur";
-    els.avatar.textContent = (name ? name.charAt(0) : "M").toUpperCase();
+    if (name) els.avatar.textContent = name.charAt(0).toUpperCase();
+    else els.avatar.innerHTML = GHOST;
     if (currentView === "home") {
       els.headTitleText.textContent = name ? "Bonjour, " + name : "Bonjour";
     }

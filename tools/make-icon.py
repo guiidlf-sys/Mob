@@ -1,34 +1,70 @@
 #!/usr/bin/env python3
-"""Régénère docs/icon.png — le « M » de l'écran d'accueil.
+"""Régénère docs/icon.png — le fantôme de Mob.
 
 Écrit le PNG à la main (zlib + struct) : aucune dépendance tierce, comme le
-reste du projet. Les couleurs sont celles du dégradé de l'app, pour que
-l'icône et l'interface ne se contredisent pas.
+reste du projet. Le fantôme est le même que celui dessiné en SVG dans la
+page ; les couleurs sont celles du dégradé de l'app, pour que l'icône et
+l'interface ne se contredisent pas.
 
     python3 tools/make-icon.py
 """
-import struct, zlib, pathlib
+import math, struct, zlib, pathlib
 
 SIZE = 180
-TOP = (0xD8, 0xB4, 0xFE)   # --accent-2
-BOTTOM = (0x7B, 0x2C, 0xBF)  # violet profond, fin du dégradé
+TOP = (0xD8, 0xB4, 0xFE)     # --accent-2
+BOTTOM = (0x7B, 0x2C, 0xBF)  # fin du dégradé
 INK = (0xFF, 0xFF, 0xFF)
 
+# Géométrie du fantôme, en pixels de l'icône.
+CX, DOME_Y, R = 90.0, 76.0, 46.0     # la coupole
+FLANC_BAS = 126.0                    # où les flancs cèdent aux festons
+LOBES, PROFONDEUR = 3, 22.0          # trois bosses vers le bas
+CREUX_MINI = 0.22                    # les creux ne remontent pas jusqu'au corps
+GAUCHE, DROITE = CX - R, CX + R
 
-def segment_distance(px, py, ax, ay, bx, by):
-    dx, dy = bx - ax, by - ay
-    span = dx * dx + dy * dy
-    t = 0.0 if not span else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / span))
-    cx, cy = ax + t * dx, ay + t * dy
-    return ((px - cx) ** 2 + (py - cy) ** 2) ** 0.5
+YEUX = [(72.0, 72.0, 9.0, 11.5), (108.0, 72.0, 9.0, 11.5)]
+BOUCHE = (90.0, 98.0, 6.5, 8.5)
 
 
-# Le « M » : deux montants et deux diagonales qui se rejoignent au centre.
-STROKES = [
-    (44, 132, 44, 48), (136, 132, 136, 48),
-    (44, 48, 90, 104), (136, 48, 90, 104),
-]
-HALF = 11.5
+def dans_ellipse(x, y, cx, cy, rx, ry):
+    return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1.0
+
+
+def dans_fantome(x, y):
+    """Coupole ronde, flancs droits, bas festonné — puis les trous."""
+    if y < DOME_Y:
+        if (x - CX) ** 2 + (y - DOME_Y) ** 2 > R * R:
+            return False
+    elif y <= FLANC_BAS:
+        if not (GAUCHE <= x <= DROITE):
+            return False
+    else:
+        if not (GAUCHE <= x <= DROITE):
+            return False
+        # Une cosinusoïde donne des lobes qui reviennent pile au bord.
+        # Sans le plancher CREUX_MINI, les lobes se rejoignent en pointe et
+        # le fantôme se met à ressembler à une mâchoire.
+        t = (x - GAUCHE) / (2 * R)
+        onde = 0.5 - 0.5 * math.cos(2 * math.pi * LOBES * t)
+        creux = FLANC_BAS + PROFONDEUR * (CREUX_MINI + (1 - CREUX_MINI) * onde)
+        if y > creux:
+            return False
+
+    for cx, cy, rx, ry in YEUX + [BOUCHE]:
+        if dans_ellipse(x, y, cx, cy, rx, ry):
+            return False       # les yeux et la bouche laissent voir le fond
+    return True
+
+
+def couverture(x, y):
+    """Trois sous-points par axe : sans ça, le contour est crénelé."""
+    dedans = 0
+    for i in range(3):
+        for j in range(3):
+            if dans_fantome(x + (i + 0.5) / 3, y + (j + 0.5) / 3):
+                dedans += 1
+    return dedans / 9.0
+
 
 rows = []
 for y in range(SIZE):
@@ -36,15 +72,14 @@ for y in range(SIZE):
     for x in range(SIZE):
         # Dégradé diagonal, comme le linear-gradient(140deg, …) de la page.
         t = (x * 0.42 + y * 0.58) / SIZE
-        base = tuple(round(TOP[i] + (BOTTOM[i] - TOP[i]) * t) for i in range(3))
-        near = min(segment_distance(x, y, *s) for s in STROKES)
-        if near <= HALF:
+        fond = tuple(round(TOP[i] + (BOTTOM[i] - TOP[i]) * t) for i in range(3))
+        k = couverture(x, y)
+        if k <= 0:
+            row += bytes(fond)
+        elif k >= 1:
             row += bytes(INK)
-        elif near <= HALF + 1.2:        # bord adouci : sinon le M est crénelé
-            k = (near - HALF) / 1.2
-            row += bytes(round(INK[i] + (base[i] - INK[i]) * k) for i in range(3))
         else:
-            row += bytes(base)
+            row += bytes(round(fond[i] + (INK[i] - fond[i]) * k) for i in range(3))
     rows.append(bytes(row))
 
 
