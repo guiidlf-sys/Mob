@@ -762,6 +762,14 @@ await check("l'infobulle du graphique reste dans sa carte", async () => {
   assert(inside, "l'infobulle sort de la carte du graphique");
 });
 
+await check("la page ne renvoie nulle part vers le dépôt", async () => {
+  // Demandé explicitement. À noter : ça retire le raccourci, pas la
+  // lisibilité du code — une page web reste lisible par ses visiteurs.
+  const liens = await page.evaluate(() =>
+    [...document.querySelectorAll("a[href]")].map((a) => a.href).filter((h) => /github\.com/i.test(h)));
+  assert(liens.length === 0, `lien(s) vers le dépôt : ${liens.join(", ")}`);
+});
+
 await check("rien ne déborde horizontalement", async () => {
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);

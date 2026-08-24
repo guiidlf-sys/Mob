@@ -128,7 +128,7 @@ de l'app, ce sont deux emplacements séparés par le système.
 `tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
 en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
 survit-elle à un rechargement — plutôt que la présence des éléments
-dans le HTML. 78 contrôles, plus 13 sur le relais.
+dans le HTML. 79 contrôles, plus 13 sur le relais.
 
 `.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
 sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull
