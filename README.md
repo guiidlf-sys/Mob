@@ -107,7 +107,7 @@ Une vraie fenêtre de réglages, en cinq sections :
 | Section | Contenu |
 |---|---|
 | **Compte** | État connecté, repère de la clé (`···1234`), nom affiché, *Modifier*, *Se déconnecter* |
-| **Apparence** | Thème **Auto / Sombre / Clair**, taille du texte sur quatre crans |
+| **Apparence** | Thème **Auto / Sombre / Clair** — sombre par défaut, taille du texte sur quatre crans |
 | **Voix** | Lecture à voix haute, vitesse de lecture |
 | **Conversation** | Modèle, mémoire relue à chaque question (4 à 60 messages) |
 | **Données** | Effacer la discussion en cours |
@@ -127,7 +127,7 @@ de l'app, ce sont deux emplacements séparés par le système.
 `tests/ui-check.mjs` pilote un navigateur et **clique chaque bouton**,
 en vérifiant l'effet obtenu — le thème change-t-il vraiment, la clé
 survit-elle à un rechargement — plutôt que la présence des éléments
-dans le HTML. 68 contrôles.
+dans le HTML. 70 contrôles.
 
 `.github/workflows/health-check.yml` la rejoue **toutes les 3 heures**
 sur le site en ligne, à chaque poussée sur `main`, et sur chaque pull
@@ -151,7 +151,9 @@ L'adresse sera **https://guiidlf-sys.github.io/Mob/**
 
 ### Première utilisation
 
-Ouvre l'adresse, touche ⚙, colle une clé d'API, **Enregistrer**.
+Ouvre l'adresse : Mob s'ouvre sur une discussion, et un bandeau propose
+**Ajouter ma clé**. Colle-la, c'est tout — elle n'est plus jamais
+redemandée sur cet appareil.
 
 Pour obtenir la clé sur [console.mistral.ai](https://console.mistral.ai)
 — deux étapes non évidentes que le site ne met pas en avant :

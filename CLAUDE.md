@@ -197,6 +197,21 @@ Morale, à garder : **les contrôles au navigateur ne remplacent pas un
 coup d'œil aux captures.** 57 contrôles passaient au vert pendant que
 trois éléments étaient visiblement cassés.
 
+## Deux réglages d'ouverture à ne pas retoucher
+
+Corrigés après une capture de l'utilisateur qui montrait une interface
+blanche ouverte sur les réglages — l'inverse de ce qu'il avait demandé :
+
+- **Le thème par défaut est `dark`, pas `auto`.** La maquette de référence
+  est sombre ; avec `auto`, un Mac en mode clair ouvrait Mob tout en blanc
+  et ça ne ressemblait plus à rien de ce qui avait été validé. « Auto »
+  reste disponible dans les réglages, ce n'est simplement plus le défaut.
+- **L'app n'atterrit jamais sur les réglages**, même sans clé. Elle ouvre
+  la conversation, et un bandeau (`#keyBanner`, au-dessus du composeur)
+  invite à ajouter la clé. Rediriger vers les réglages escamotait
+  l'interface dès l'ouverture — c'est précisément ce qui était reproché.
+  Une question posée sans clé reste en attente et part dès qu'elle arrive.
+
 ## Discussions multiples — le stockage a changé de forme
 
 `mob.history` (une seule conversation) a été remplacé par **`mob.chats`**,

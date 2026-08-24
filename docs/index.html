@@ -18,7 +18,7 @@
   // de page.
   (function () {
     try {
-      var c = JSON.parse(localStorage.getItem("mob.theme") || '"auto"');
+      var c = JSON.parse(localStorage.getItem("mob.theme") || '"dark"');
       var dark = c === "dark" || (c === "auto" &&
         (!window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches));
       document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
@@ -313,6 +313,20 @@
   .quick button b { display: block; font-size: 14px; font-weight: 620; margin-top: 7px; }
   .quick button small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
 
+  /* Rappel de la clé manquante. Il remplace l'ancien atterrissage forcé
+     sur les réglages, qui escamotait l'interface dès l'ouverture. */
+  .key-banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin: 0 16px 10px; padding: 12px 15px; border-radius: 15px;
+    border: 1px solid var(--accent); background: var(--surface); font-size: 13.5px;
+  }
+  .key-banner span { flex: 1; min-width: 150px; }
+  .key-banner button {
+    flex-shrink: 0; padding: 9px 15px; border-radius: 999px; cursor: pointer;
+    border: none; color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 620;
+    background: linear-gradient(140deg, var(--accent-2), var(--accent));
+  }
+
   /* Bandeau de la conversation : son titre et le bouton « nouvelle ». */
   .chat-bar { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; }
   .chat-bar b {
@@ -515,6 +529,7 @@
       background: var(--panel); overflow: hidden; flex-direction: column;
     }
     .chat-bar { padding: 0 24px 8px; }
+    .key-banner { margin: 0 24px 10px; }
     header.page-head { padding: 20px 24px 12px; flex-wrap: nowrap; align-items: center; }
     .head-text h1 { font-size: 26px; }
     .askbar { width: 250px; }
@@ -644,6 +659,10 @@
         <button type="button" id="newChat">＋ Nouvelle</button>
       </div>
       <div class="scroll"><div id="messages"></div></div>
+      <div class="key-banner" id="keyBanner" hidden>
+        <span>Ajoute ta clé Mistral pour que Mob puisse répondre.</span>
+        <button type="button" id="addKey">Ajouter ma clé</button>
+      </div>
       <div id="composer">
         <button class="round" id="mic" type="button" title="Dicter">🎙</button>
         <textarea id="input" rows="1" placeholder="Parle à Mob…" enterkeyhint="send"></textarea>
@@ -712,7 +731,7 @@
 
         <div class="card">
           <h2>Apparence</h2>
-          <p class="sub">Le thème suit ton iPhone si tu laisses « Auto ».</p>
+          <p class="sub">Mob est sombre par défaut, comme son interface. « Auto » le fait suivre ton appareil.</p>
           <div class="field">
             <label>Thème</label>
             <div class="seg" id="themeSeg" role="group" aria-label="Thème">
@@ -1006,6 +1025,7 @@
     creations: el("creations"),
     chatTitle: el("chatTitle"), newChat: el("newChat"), newChat2: el("newChat2"),
     histList: el("histList"), clearAll: el("clearAll"),
+    keyBanner: el("keyBanner"), addKey: el("addKey"),
     statMsgs: el("statMsgs"), statImgs: el("statImgs"), statSites: el("statSites"), statSize: el("statSize")
   };
 
@@ -1512,7 +1532,7 @@
       var line = document.createElement("div");
       line.textContent = store.get("mob.key", "")
         ? "Pose une question, ou touche 🎙 pour parler."
-        : "Commence par ajouter ta clé dans Réglages.";
+        : "Ajoute ta clé juste en dessous, et c'est parti.";
       empty.appendChild(line);
 
       if (store.get("mob.key", "")) {
@@ -1780,8 +1800,10 @@
   function ask(text) {
     var key = store.get("mob.key", "");
     if (!key) {
+      // La question est gardée et posée dès que la clé arrive ; on reste
+      // sur la conversation, c'est le bandeau qui dit quoi faire.
       pendingQuestion = text;
-      show("settings");
+      show("chat");
       return;
     }
     show("chat");
@@ -1955,7 +1977,7 @@
   // « auto » n'est pas une valeur CSS : on la résout ici et on repose
   // data-theme en dur, pour que la feuille de style n'ait que deux cas.
   function applyTheme() {
-    var choice = store.get("mob.theme", "auto");
+    var choice = store.get("mob.theme", "dark");
     var dark = choice === "dark" || (choice === "auto" && (!systemDark || systemDark.matches));
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     var meta = document.querySelector('meta[name="theme-color"]');
@@ -1965,7 +1987,7 @@
 
   if (systemDark && systemDark.addEventListener) {
     systemDark.addEventListener("change", function () {
-      if (store.get("mob.theme", "auto") === "auto") applyTheme();
+      if (store.get("mob.theme", "dark") === "auto") applyTheme();
     });
   }
 
@@ -2030,6 +2052,7 @@
     // redemande plus la clé à chaque passage dans les réglages.
     els.keyFields.hidden = connected;
     els.displayNameInput.value = displayName();
+    els.keyBanner.hidden = connected;
     syncProfile();
   }
 
@@ -2053,6 +2076,11 @@
   els.displayNameInput.addEventListener("change", function () {
     store.set("mob.name", els.displayNameInput.value.trim().slice(0, 24));
     syncProfile();
+  });
+
+  els.addKey.addEventListener("click", function () {
+    show("settings");
+    els.key.focus();
   });
 
   els.editKey.addEventListener("click", function () {
@@ -2268,11 +2296,10 @@
   if (asked && asked.trim()) {
     unlockSpeech();
     ask(asked.trim());          // ask() met la question de côté s'il manque la clé
-  } else if (!store.get("mob.key", "")) {
-    show("settings");
   } else {
     // Entrer sur le site ouvre une discussion neuve — les précédentes
-    // restent accessibles par l'onglet Historique.
+    // restent accessibles par l'onglet Historique. Même sans clé :
+    // l'interface n'est plus escamotée, le bandeau invite à l'ajouter.
     show("chat");
   }
 })();
