@@ -442,6 +442,22 @@ ont montré ce que 15 contrôles verts ne voyaient pas : top 3 coupé, notes
 tassées au centre du graphe par des ressorts trop forts, console vide
 après rechargement.
 
+**Accès depuis le téléphone et les autres ordinateurs** (`--partage`,
+demandé par l'utilisateur) : le Mac reste le cerveau, les autres appareils
+affichent le même Jarvis dans leur navigateur après un **appairage par
+code à 6 chiffres** (classe `Access`). Le code vit 5 min, meurt après
+5 essais ; l'appareil garde un jeton en cookie `HttpOnly; SameSite=Strict`,
+le Mac n'en stocke que le SHA-256 (`~/.jarvis/devices.json`, 0600).
+« Propriétaire » = boucle locale **et** Host local : une requête arrivant
+par `tailscale serve` ou par rebinding DNS passe par la boucle locale
+mais n'est pas propriétaire — elle ne peut ni créer de code ni retirer
+d'appareil. Ne relâche pas cette règle. PWA (manifeste + `orb_png()`) pour
+l'écran d'accueil. Testé avec un vrai second client sur l'IP réseau du
+conteneur (unittest + Playwright : appairage, code faux, révocation).
+Limites honnêtes : le Mac doit être allumé ; le micro du navigateur
+exige HTTPS, donc refusé sur `http://` du Wi-Fi (le HUD le dit, dictée
+par le clavier) ; hors de la maison → Tailscale, **non testé ici**.
+
 Vérifier : `python3 -m unittest hud/test_server.py` et
 `node tests/hud-check.mjs` (vrai navigateur, faux `claude`), aussi en CI
 (`.github/workflows/hud-check.yml`).

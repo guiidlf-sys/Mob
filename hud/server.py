@@ -12,24 +12,36 @@ dériver. Le serveur :
 - déclenche seul les routines de la journée (7 h, 9 h, 14 h, 19 h) ;
 - consigne chaque échange dans le journal du coffre.
 
-Il n'écoute que 127.0.0.1 et refuse toute requête dont l'en-tête Host
-n'est pas le sien : une page web quelconque ne peut pas lui faire lancer
-une commande (ni par formulaire, ni par rebinding DNS).
+Par défaut il n'écoute que 127.0.0.1 et refuse toute requête dont l'en-tête
+Host n'est pas le sien : une page web quelconque ne peut pas lui faire
+lancer une commande (ni par formulaire, ni par rebinding DNS).
+
+Avec --partage, il s'ouvre au réseau pour le téléphone et les autres
+ordinateurs : chaque appareil s'appaire une fois avec un code à 6 chiffres
+affiché sur le Mac, et tout le reste lui est fermé (voir Access).
 """
 import argparse
 import datetime as dt
+import hashlib
+import hmac
+import ipaddress
 import json
 import os
 import platform
 import re
+import secrets
 import shutil
+import socket
+import struct
 import subprocess
 import sys
 import threading
 import time
 import urllib.error
 import urllib.request
+import zlib
 from collections import deque
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -544,11 +556,168 @@ class Jarvis:
         }
 
 
+# ------------------------------------------------------------- appareils
+
+DEVICE_COOKIE = "jarvis_device"
+
+
+class Access:
+    """Qui a le droit d'entrer quand le HUD est ouvert aux autres appareils.
+
+    Le Mac lui-même (boucle locale, Host local) est le propriétaire. Un autre
+    appareil s'appaire une fois avec un code à 6 chiffres affiché sur le Mac :
+    le code vit 5 minutes et meurt après 5 essais faux, donc le deviner a une
+    chance sur 200 000. L'appareil reçoit alors un jeton long, gardé dans un
+    cookie ; le serveur n'en conserve que l'empreinte, et on le révoque d'un clic.
+    """
+
+    CODE_TTL = 300
+    MAX_TRIES = 5
+
+    def __init__(self, path, clock=time.time):
+        self.path = Path(path).expanduser()
+        self.clock = clock
+        self.lock = threading.Lock()
+        self.code, self.code_expires, self.tries = None, 0.0, 0
+        try:
+            self.devices = json.loads(self.path.read_text(encoding="utf-8"))
+            if not isinstance(self.devices, list):
+                raise ValueError
+        except (OSError, ValueError):
+            self.devices = []
+
+    def _save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.devices, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(self.path)
+
+    @staticmethod
+    def _digest(token):
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def start_pairing(self):
+        with self.lock:
+            self.code = f"{secrets.randbelow(10 ** 6):06d}"
+            self.code_expires = self.clock() + self.CODE_TTL
+            self.tries = 0
+            return self.code, self.CODE_TTL
+
+    def pair(self, code, name):
+        """Renvoie (jeton, None) si le code est bon, sinon (None, raison)."""
+        with self.lock:
+            if not self.code or self.clock() > self.code_expires:
+                self.code = None
+                return None, "Aucun code actif — affiches-en un sur le Mac."
+            self.tries += 1
+            if not hmac.compare_digest(str(code).strip().encode("utf-8"), self.code.encode("utf-8")):
+                if self.tries >= self.MAX_TRIES:
+                    self.code = None
+                    return None, "Code faux, trop d'essais : demande un nouveau code sur le Mac."
+                return None, "Code faux."
+            self.code = None
+            token = secrets.token_urlsafe(32)
+            now = self.clock()
+            self.devices.append({
+                "id": secrets.token_hex(4),
+                "name": " ".join(str(name).split())[:40] or "Appareil",
+                "created": now, "seen": now, "hash": self._digest(token),
+            })
+            self._save()
+            return token, None
+
+    def device_for(self, token):
+        if not token:
+            return None
+        digest = self._digest(token)
+        with self.lock:
+            for device in self.devices:
+                if hmac.compare_digest(device["hash"], digest):
+                    if self.clock() - device.get("seen", 0) > 300:
+                        device["seen"] = self.clock()
+                        self._save()
+                    return device
+        return None
+
+    def revoke(self, device_id):
+        with self.lock:
+            before = len(self.devices)
+            self.devices = [d for d in self.devices if d["id"] != device_id]
+            if len(self.devices) != before:
+                self._save()
+                return True
+            return False
+
+    def listing(self):
+        with self.lock:
+            return [{k: d[k] for k in ("id", "name", "created", "seen")} for d in self.devices]
+
+
+def reachable_urls(port):
+    """Les adresses auxquelles un autre appareil peut joindre ce HUD."""
+    urls = []
+    name = platform.node().split(".")[0]
+    if platform.system() == "Darwin":
+        name = _sh("scutil", "--get", "LocalHostName").strip() or name
+    if name:
+        urls.append(f"http://{name}.local:{port}/")
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("10.255.255.255", 1))  # aucun paquet n'est envoyé
+        ip = probe.getsockname()[0]
+        probe.close()
+        if not ip.startswith("127."):
+            urls.append(f"http://{ip}:{port}/")
+    except OSError:
+        pass
+    tail = _sh("tailscale", "ip", "-4").strip().splitlines()
+    if tail:
+        urls.append(f"http://{tail[0]}:{port}/")
+    return urls
+
+
+def orb_png(size=192):
+    """L'icône d'écran d'accueil : un orbe cuivré, écrit en PNG à la main."""
+    rows = []
+    c = (size - 1) / 2
+    for y in range(size):
+        row = bytearray([0])
+        for x in range(size):
+            d = ((x - c) ** 2 + (y - c) ** 2) ** 0.5 / (size / 2)
+            glow = max(0.0, 1 - d / 0.62) ** 1.6
+            core = max(0.0, 1 - d / 0.18)
+            r = int(10 + 207 * glow + 38 * core)
+            g = int(9 + 121 * glow + 110 * core)
+            b = int(13 + 78 * glow + 134 * core)
+            row += bytes((min(r, 255), min(g, 255), min(b, 255)))
+        rows.append(bytes(row))
+
+    def chunk(kind, data):
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+            + chunk(b"IEND", b""))
+
+
+MANIFEST = {
+    "name": "Jarvis", "short_name": "Jarvis", "start_url": "/", "display": "standalone",
+    "background_color": "#0a090d", "theme_color": "#0a090d",
+    "icons": [{"src": "/icon.png", "sizes": "192x192", "type": "image/png"}],
+}
+
+
 # ------------------------------------------------------------------ HTTP
 
-def make_handler(jarvis, port):
-    allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+def make_handler(jarvis, port, access=None, urls=()):
+    """`access` à None : HUD réservé au Mac. Sinon, ouvert aux appareils appairés."""
+    allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
     page = (HUD_DIR / "index.html").read_bytes()
+    icon = orb_png()
+    public = {"/", "/index.html", "/manifest.webmanifest", "/icon.png"}
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "JarvisHUD/1"
@@ -556,7 +725,7 @@ def make_handler(jarvis, port):
         def log_message(self, fmt, *args):  # silencieux : le journal est dans le coffre
             pass
 
-        def _send(self, status, body, kind="application/json; charset=utf-8"):
+        def _send(self, status, body, kind="application/json; charset=utf-8", cookie=None):
             if not isinstance(body, bytes):
                 body = json.dumps(body, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
@@ -564,26 +733,80 @@ def make_handler(jarvis, port):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            if cookie:
+                self.send_header("Set-Cookie", cookie)
             self.end_headers()
             self.wfile.write(body)
 
-        def _trusted(self):
-            # Rebinding DNS : un domaine étranger qui pointe vers 127.0.0.1
-            # arrive avec son propre Host. On ne répond qu'au nôtre.
-            if self.headers.get("Host") not in allowed_hosts:
-                self._send(403, {"error": "hôte refusé"})
+        def _owner(self):
+            # Le Mac lui-même. Le Host compte aussi : un domaine étranger qui
+            # pointe vers 127.0.0.1 (rebinding DNS), ou un relais local comme
+            # `tailscale serve`, arrive par la boucle locale avec un autre Host.
+            try:
+                ip = ipaddress.ip_address(self.client_address[0])
+                ip = getattr(ip, "ipv4_mapped", None) or ip
+            except ValueError:
                 return False
-            return True
+            return ip.is_loopback and self.headers.get("Host") in allowed_hosts
+
+        def _device(self):
+            if access is None:
+                return None
+            jar = SimpleCookie()
+            try:
+                jar.load(self.headers.get("Cookie", ""))
+            except CookieError:
+                return None
+            morsel = jar.get(DEVICE_COOKIE)
+            return access.device_for(morsel.value if morsel else "")
+
+        def _who(self, path):
+            """'owner', un appareil, 'guest' (page publique), ou None (déjà refusé)."""
+            if self._owner():
+                return "owner"
+            if access is None:
+                self._send(403, {"error": "hôte refusé"})
+                return None
+            device = self._device()
+            if device:
+                return device
+            if path in public or path == "/api/pair":
+                return "guest"
+            self._send(401, {"error": "appareil non connecté", "pair": True})
+            return None
+
+        def _json(self):
+            length = min(int(self.headers.get("Content-Length", "0")), 20000)
+            data = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(data, dict):
+                raise ValueError
+            return data
 
         def do_GET(self):
-            if not self._trusted():
-                return
             url = urlparse(self.path)
+            who = self._who(url.path)
+            if who is None:
+                return
             query = parse_qs(url.query)
             if url.path in ("/", "/index.html"):
                 return self._send(200, page, "text/html; charset=utf-8")
+            if url.path == "/icon.png":
+                return self._send(200, icon, "image/png")
+            if url.path == "/manifest.webmanifest":
+                return self._send(200, MANIFEST, "application/manifest+json")
             if url.path == "/api/state":
-                return self._send(200, jarvis.state())
+                state = jarvis.state()
+                state["access"] = {
+                    "shared": access is not None, "owner": who == "owner",
+                    "device": None if who == "owner" else who["name"],
+                    "devices": len(access.listing()) if access else 0,
+                    "urls": list(urls) if who == "owner" else [],
+                }
+                return self._send(200, state)
+            if url.path == "/api/devices":
+                if who != "owner" or access is None:
+                    return self._send(403, {"error": "réservé au Mac"})
+                return self._send(200, access.listing())
             if url.path == "/api/graph":
                 return self._send(200, jarvis.vault.graph())
             if url.path == "/api/search":
@@ -597,19 +820,42 @@ def make_handler(jarvis, port):
             self._send(404, {"error": "inconnu"})
 
         def do_POST(self):
-            if not self._trusted():
+            path = urlparse(self.path).path
+            who = self._who(path)
+            if who is None:
                 return
             # Un formulaire d'un autre site ne peut pas poser cet en-tête sans
             # une requête préalable (CORS) à laquelle on ne répond jamais.
             if self.headers.get("X-Jarvis") != "1":
                 return self._send(403, {"error": "en-tête X-Jarvis manquant"})
-            if urlparse(self.path).path != "/api/command":
-                return self._send(404, {"error": "inconnu"})
             try:
-                length = min(int(self.headers.get("Content-Length", "0")), 20000)
-                text = str(json.loads(self.rfile.read(length) or b"{}").get("text", "")).strip()
+                data = self._json()
             except (ValueError, AttributeError):
                 return self._send(400, {"error": "JSON attendu"})
+
+            if path == "/api/pair":
+                if access is None:
+                    return self._send(403, {"error": "HUD réservé au Mac"})
+                token, why = access.pair(data.get("code", ""), data.get("name", ""))
+                if not token:
+                    return self._send(403, {"error": why})
+                cookie = (f"{DEVICE_COOKIE}={token}; Path=/; Max-Age=31536000; "
+                          "HttpOnly; SameSite=Strict")
+                return self._send(200, {"ok": True}, cookie=cookie)
+            if who == "guest":
+                return self._send(401, {"error": "appareil non connecté", "pair": True})
+            if path == "/api/pair/start":
+                if who != "owner" or access is None:
+                    return self._send(403, {"error": "réservé au Mac"})
+                code, ttl = access.start_pairing()
+                return self._send(200, {"code": code, "ttl": ttl, "urls": list(urls)})
+            if path == "/api/devices/revoke":
+                if who != "owner" or access is None:
+                    return self._send(403, {"error": "réservé au Mac"})
+                return self._send(200, {"ok": access.revoke(str(data.get("id", "")))})
+            if path != "/api/command":
+                return self._send(404, {"error": "inconnu"})
+            text = str(data.get("text", "")).strip()
             if not text:
                 return self._send(400, {"error": "commande vide"})
             self._send(200, jarvis.command(text[:4000]))
@@ -625,6 +871,11 @@ def main(argv=None):
                         default=os.environ.get("JARVIS_ENGINE", "claude"))
     parser.add_argument("--no-auto", action="store_true",
                         help="ne pas lancer seul les routines de la journée")
+    parser.add_argument("--partage", "--lan", dest="shared", action="store_true",
+                        default=os.environ.get("JARVIS_HUD_SHARE") == "1",
+                        help="ouvrir le HUD au téléphone et aux autres ordinateurs (code d'appairage)")
+    parser.add_argument("--home", default=os.environ.get("JARVIS_HOME", "~/.jarvis"),
+                        help="où ranger la liste des appareils appairés")
     args = parser.parse_args(argv)
 
     vault = Vault(args.vault)
@@ -642,9 +893,17 @@ def main(argv=None):
                 time.sleep(20)
         threading.Thread(target=scheduler, daemon=True).start()
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(jarvis, args.port))
+    access = Access(Path(args.home).expanduser() / "devices.json") if args.shared else None
+    urls = reachable_urls(args.port) if args.shared else []
+    host = "0.0.0.0" if args.shared else "127.0.0.1"
+    server = ThreadingHTTPServer((host, args.port), make_handler(jarvis, args.port, access, urls))
     ok, detail = engine.status()
     print(f"Jarvis HUD → http://127.0.0.1:{args.port}/")
+    if args.shared:
+        print("  partage : téléphone et autres ordinateurs, après appairage —")
+        for url in urls:
+            print(f"            {url}")
+        print("            (code à 6 chiffres : bouton « Connecter un appareil » du HUD)")
     print(f"  coffre  : {vault.path}")
     print(f"  moteur  : {detail}" + ("" if ok else "  (les commandes renverront ce message)"))
     print(f"  routines: {'désactivées' if args.no_auto else '07:00 · 09:00 · 14:00 · 19:00'}")

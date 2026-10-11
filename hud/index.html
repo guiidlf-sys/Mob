@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a090d">
 <title>Jarvis HUD</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a090d%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%277%27 fill=%27%23d9825b%27/%3E%3C/svg%3E">
 <style>
   :root {
@@ -180,6 +186,24 @@
   .stage.on { color: var(--accent); background: rgba(217,130,91,.07); }
   .stage.on small { color: var(--dim); }
 
+  .sheet { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
+    background: rgba(5,4,7,.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .sheet .card { width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+    border: 1px solid var(--line-hi); border-radius: 12px; background: var(--panel); padding: 20px; }
+  .sheet h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+  .sheet p { color: var(--dim); margin: 6px 0 12px; }
+  .sheet input { width: 100%; background: #0d0b10; border: 1px solid var(--line-hi); border-radius: 8px;
+    padding: 10px 12px; outline: none; margin-bottom: 8px; }
+  .sheet input:focus { border-color: var(--accent); }
+  #pairCode { font-size: 28px; letter-spacing: .35em; text-align: center; }
+  .bigcode { font-size: 40px; letter-spacing: .3em; text-align: center; color: var(--ink); margin: 6px 0; }
+  .sheet .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+  .sheet .err { color: var(--bad); min-height: 1.5em; }
+  .sheet ul { list-style: none; padding: 0; margin: 6px 0; }
+  .sheet li { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .sheet li small { color: var(--faint); display: block; }
+  .sheet code { color: var(--accent-hi); word-break: break-all; }
   #offline { position: fixed; inset: auto 12px 64px auto; max-width: 360px; padding: 10px 14px;
     border: 1px solid var(--bad); background: #1a0f10; border-radius: 8px; color: var(--ink); z-index: 5; }
 
@@ -288,6 +312,23 @@
     <div class="stage" data-stage="remember">REMEMBER<small>—</small></div>
   </footer>
 </div>
+<div class="sheet" id="loginSheet" hidden>
+  <form class="card" id="loginForm" autocomplete="off">
+    <h3>Connecter cet appareil</h3>
+    <p>Sur le Mac, dans le HUD : <b>Connecter un appareil</b>. Tape ici le code à 6 chiffres qui s'affiche. Une seule fois par appareil.</p>
+    <input id="pairCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-label="Code d'appairage">
+    <input id="pairName" maxlength="40" placeholder="Nom de cet appareil" aria-label="Nom de cet appareil">
+    <div class="err" id="pairErr"></div>
+    <div class="row"><button class="btn on" type="submit">Connecter</button></div>
+  </form>
+</div>
+<div class="sheet" id="devSheet" hidden>
+  <div class="card">
+    <h3>Téléphone et autres ordinateurs</h3>
+    <div id="devBody"></div>
+    <div class="row"><button class="btn" type="button" id="devClose">Fermer</button></div>
+  </div>
+</div>
 <div id="offline" hidden>Serveur du HUD injoignable. Relance <code>python3 hud/server.py</code>.</div>
 
 <script>
@@ -309,7 +350,8 @@ async function api(path, body) {
   };
   const r = await fetch(path, opts);
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  if (r.status === 401 && data.pair) showLogin();
+  if (!r.ok) { const e = new Error(data.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
   return data;
 }
 
@@ -421,7 +463,7 @@ function drawSpark() {
 async function refresh() {
   let st;
   try { st = await api("/api/state"); $("#offline").hidden = true; }
-  catch (e) { $("#offline").hidden = false; $("#status").textContent = "HORS LIGNE"; $("#status").className = "bad"; return; }
+  catch (e) { if (e.status === 401 || e.status === 403) return; $("#offline").hidden = false; $("#status").textContent = "HORS LIGNE"; $("#status").className = "bad"; return; }
   lastState = st;
   $("#status").textContent = st.busy ? "EXÉCUTION" : "ACTIF";
   $("#status").className = "";
@@ -437,7 +479,11 @@ async function refresh() {
     `<div class="kv"><span>Allumé depuis</span><span>${duration(v.uptime)}</span></div>` +
     `<div class="kv"><span>Moteur</span><span>${esc(st.engine.detail)}</span></div>` +
     `<div class="kv"><span>Coffre</span><span title="${esc(st.vault.path)}">${esc(st.vault.path)}</span></div>` +
-    `<div class="kv"><span>Échanges récents</span><span>${st.jobs.length}</span></div>`;
+    `<div class="kv"><span>Échanges récents</span><span>${st.jobs.length}</span></div>` +
+    (st.access.owner
+      ? `<div class="kv"><span>Appareils</span><span><button class="btn" type="button" id="devBtn">${st.access.shared ? st.access.devices + " · connecter" : "connecter"}</button></span></div>`
+      : `<div class="kv"><span>Cet appareil</span><span>${esc(st.access.device || "—")}</span></div>`);
+  access = st.access;
 
   if (typeof v.cpu === "number") { cpuHist.push(v.cpu); if (cpuHist.length > 60) cpuHist.shift(); drawSpark(); }
 
@@ -673,6 +719,9 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false, stream = null, audioCtx = null, raf = 0;
 if (!SR) {
   $("#micInfo").textContent = "Dictée indisponible ici — Dun au clavier de l'iPhone, ou Chrome / Safari";
+} else if (!window.isSecureContext) {
+  // Hors HTTPS (adresse Wi-Fi en http://), le navigateur refuse le micro.
+  $("#micInfo").textContent = "Micro bloqué hors HTTPS — dicte au clavier (Dun, ou 🎤 du clavier)";
 }
 async function startMeter() {
   try {
@@ -695,6 +744,7 @@ function listen() {
   if (!SR) { line("sys", "", "La dictée n'existe pas dans ce navigateur. Sur l'iPhone : le clavier Dun dans le champ de commande."); $("#cmd").focus(); return; }
   if (listening) { rec && rec.stop(); return; }
   synth && synth.cancel();
+  if (!window.isSecureContext) { line("sys", "", "Ici le navigateur refuse le micro (adresse non sécurisée). Dicte avec le clavier : Dun, ou le 🎤 du clavier."); $("#cmd").focus(); return; }
   rec = new SR(); rec.lang = "fr-FR"; rec.interimResults = true; rec.continuous = false;
   let finalText = "";
   rec.onstart = () => { listening = true; $("#micBtn").classList.add("live"); $("#micBtn2").classList.add("live"); $("#voiceState").textContent = "écoute"; resetStages(); stage("speak", "écoute…"); startMeter(); };
@@ -721,6 +771,68 @@ $("#micBtn2").addEventListener("click", listen);
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && !e.repeat && !["INPUT", "TEXTAREA", "BUTTON"].includes(document.activeElement.tagName)) { e.preventDefault(); listen(); }
 });
+
+/* ----------------------------------------------------------- appareils */
+let access = { shared: false, owner: true, urls: [] };
+function guessName() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return "iPhone"; if (/iPad/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android"; if (/Mac/.test(ua)) return "Mac";
+  if (/Windows/.test(ua)) return "PC Windows"; if (/Linux/.test(ua)) return "Linux";
+  return "Appareil";
+}
+function showLogin() {
+  if (!$("#loginSheet").hidden) return;
+  $("#pairName").value = $("#pairName").value || guessName();
+  $("#loginSheet").hidden = false;
+  setTimeout(() => $("#pairCode").focus(), 50);
+}
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#pairErr").textContent = "";
+  try {
+    await api("/api/pair", { code: $("#pairCode").value.trim(), name: $("#pairName").value.trim() });
+    $("#loginSheet").hidden = true;
+    location.reload();
+  } catch (err) { $("#pairErr").textContent = err.message; $("#pairCode").select(); }
+});
+let codeTimer = null;
+async function openDevices() {
+  $("#devSheet").hidden = false;
+  const body = $("#devBody");
+  if (!access.shared) {
+    body.innerHTML = `<p>Pour l'instant, Jarvis n'accepte que ce Mac. Pour l'ouvrir à ton téléphone et à tes autres ordinateurs, relance-le avec :</p>
+      <p><code>python3 hud/server.py --partage</code></p>
+      <p>Chaque appareil devra ensuite entrer, une seule fois, un code à 6 chiffres affiché ici.</p>`;
+    return;
+  }
+  let pair;
+  try { pair = await api("/api/pair/start", {}); } catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const devices = await api("/api/devices").catch(() => []);
+  const fmt = (t) => new Date(t * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  body.innerHTML = `<p>1. Sur le téléphone ou l'autre ordinateur, ouvre une de ces adresses (même Wi-Fi) :</p>
+    <ul>${(pair.urls.length ? pair.urls : ["(aucune adresse réseau trouvée)"]).map((u) => `<li><code>${esc(u)}</code></li>`).join("")}</ul>
+    <p>2. Entre ce code :</p>
+    <div class="bigcode" id="bigCode">${pair.code}</div>
+    <p style="text-align:center" id="codeLeft"></p>
+    <h3 style="margin-top:14px">Appareils connectés</h3>
+    <ul id="devList">${devices.length ? devices.map((d) => `<li><span>${esc(d.name)}<small>depuis le ${fmt(d.created)} · vu le ${fmt(d.seen)}</small></span><button class="btn" type="button" data-revoke="${esc(d.id)}">Retirer</button></li>`).join("") : `<li class="muted">Aucun pour l'instant.</li>`}</ul>`;
+  const until = Date.now() + pair.ttl * 1000;
+  clearInterval(codeTimer);
+  const tick = () => {
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    $("#codeLeft").textContent = left ? `valable encore ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "expiré — rouvre ce panneau";
+    if (!left) { clearInterval(codeTimer); $("#bigCode").style.opacity = .3; }
+  };
+  tick(); codeTimer = setInterval(tick, 1000);
+}
+document.addEventListener("click", (e) => { if (e.target.id === "devBtn") openDevices(); });
+$("#devBody").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-revoke]"); if (!b) return;
+  await api("/api/devices/revoke", { id: b.dataset.revoke }).catch(() => {});
+  b.closest("li").remove(); refresh();
+});
+$("#devClose").addEventListener("click", () => { $("#devSheet").hidden = true; clearInterval(codeTimer); });
 
 /* ---------------------------------------------------------- démarrage */
 setMeter([], "in");

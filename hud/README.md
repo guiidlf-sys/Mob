@@ -121,7 +121,7 @@ cat > ~/Library/LaunchAgents/os.jarvis.hud.plist <<PLIST
 <plist version="1.0"><dict>
   <key>Label</key><string>os.jarvis.hud</string>
   <key>ProgramArguments</key><array>
-    <string>/usr/bin/python3</string><string>$PWD/hud/server.py</string>
+    <string>/usr/bin/python3</string><string>$PWD/hud/server.py</string><string>--partage</string>
   </array>
   <key>EnvironmentVariables</key><dict>
     <key>PATH</key><string>$(dirname "$(which claude)"):/usr/bin:/bin</string>
@@ -132,7 +132,68 @@ PLIST
 launchctl load ~/Library/LaunchAgents/os.jarvis.hud.plist
 ```
 
-(À lancer depuis la racine du dépôt : `$PWD` y devient le bon chemin.)
+(À lancer depuis la racine du dépôt : `$PWD` y devient le bon chemin.
+Retire la ligne `--partage` si Jarvis doit rester réservé au Mac.)
+
+## Sur ton téléphone et tes autres ordinateurs
+
+Le Mac reste le cerveau : Claude Code et le coffre y vivent. Les autres
+appareils affichent **le même** Jarvis — même mémoire, même historique,
+mêmes routines — dans leur navigateur.
+
+**1. Sur le Mac**, lance Jarvis en mode partage :
+
+```
+python3 hud/server.py --partage
+```
+
+macOS demande s'il faut « accepter les connexions entrantes » pour
+python3 : **Autoriser**. Le terminal affiche les adresses du Mac, par
+exemple `http://MacBook-Air.local:7777/`.
+
+**2. Dans le HUD du Mac**, panneau Vitals → **Appareils · connecter**.
+Un code à 6 chiffres s'affiche, avec les adresses à ouvrir.
+
+**3. Sur le téléphone ou l'autre ordinateur** (même Wi-Fi), ouvre une de
+ces adresses dans le navigateur, et tape le code. C'est fait, une fois
+pour toutes : l'appareil reste connecté.
+
+**4. Sur l'iPhone**, Partager → **Sur l'écran d'accueil** : Jarvis a son
+icône et s'ouvre en plein écran, comme une app.
+
+Pour **retirer** un appareil (téléphone perdu, PC prêté) : même panneau,
+bouton **Retirer**. Il retombe aussitôt sur l'écran de code.
+
+### Hors de chez toi
+
+Le Wi-Fi de la maison ne suffit plus dès que tu sors. La voie simple et
+gratuite : **[Tailscale](https://tailscale.com)**, un réseau privé entre
+tes appareils.
+
+1. Installe Tailscale sur le Mac et sur le téléphone, même compte.
+2. Relance `python3 hud/server.py --partage` : une adresse en `100.x.x.x`
+   s'ajoute à la liste. Elle marche partout, 4G comprise, et le trafic
+   est chiffré.
+
+Bonus : `tailscale serve --bg 7777` sur le Mac donne une adresse
+**https://** (activer HTTPS dans la console Tailscale si demandé). En
+HTTPS, le micro du navigateur fonctionne aussi sur le téléphone. *Non
+testé ici : pas de Tailscale dans le conteneur où ce code a été écrit.*
+
+### Ce qu'il faut savoir
+
+- **Le Mac doit être allumé et éveillé.** Pour l'empêcher de dormir tant
+  que Jarvis tourne : `caffeinate -i python3 hud/server.py --partage`.
+- **Le micro du navigateur exige HTTPS.** Sur une adresse `http://` du
+  Wi-Fi, le téléphone refuse le micro : dicte avec le clavier (Dun, ou le
+  🎤 du clavier iOS). Le HUD le dit au lieu d'échouer en silence. La
+  lecture à voix haute, elle, marche partout.
+- **En `http://`, le Wi-Fi transporte tout en clair** sur le réseau local.
+  Chez toi, ça va ; sur un Wi-Fi public, passe par Tailscale.
+- **Un autre ordinateur peut aussi faire tourner son propre Jarvis**
+  (Windows, Linux : Python 3.9+ et Claude Code suffisent). Mais il aura
+  sa propre mémoire, sauf à partager le coffre (dossier synchronisé,
+  `JARVIS_VAULT`). Le plus simple reste un seul cerveau : le Mac.
 
 ### Réglages
 
@@ -141,6 +202,8 @@ launchctl load ~/Library/LaunchAgents/os.jarvis.hud.plist
 | `--port` / `JARVIS_HUD_PORT` | `7777` | port local |
 | `--vault` / `JARVIS_VAULT` | `vault/` | n'importe quel coffre Obsidian |
 | `--engine` / `JARVIS_ENGINE` | `claude` | `ollama` pour du 100 % local |
+| `--partage` / `JARVIS_HUD_SHARE=1` | non | ouvre le HUD aux appareils appairés |
+| `--home` / `JARVIS_HOME` | `~/.jarvis` | où ranger la liste des appareils |
 | `JARVIS_ALLOWED_TOOLS` | `Read,Write,Edit,Glob,Grep,WebSearch,WebFetch` | outils accordés à Claude |
 | `JARVIS_CLAUDE_BIN` | `claude` | chemin du binaire |
 
@@ -156,11 +219,19 @@ qualité d'un ~3B (cf. la décision backend dans `CLAUDE.md`).
 
 ### Sécurité
 
-Le serveur n'écoute que `127.0.0.1`. Il refuse toute requête dont l'en-tête
-`Host` n'est pas le sien (une page web malveillante qui viserait ton
-localhost via un domaine piégé est rejetée), et chaque commande exige un
-en-tête `X-Jarvis` qu'un formulaire d'un autre site ne peut pas poser. La
-lecture de notes ne sort jamais du coffre.
+Par défaut, le serveur n'écoute que `127.0.0.1`. Il refuse toute requête
+dont l'en-tête `Host` n'est pas le sien (une page web malveillante qui
+viserait ton localhost via un domaine piégé est rejetée), et chaque
+commande exige un en-tête `X-Jarvis` qu'un formulaire d'un autre site ne
+peut pas poser. La lecture de notes ne sort jamais du coffre.
+
+Avec `--partage`, un appareil inconnu ne voit que l'écran de code. Le code
+vit 5 minutes et meurt après 5 essais faux (1 chance sur 200 000 de le
+deviner). L'appareil reçoit un jeton dans un cookie `HttpOnly`,
+`SameSite=Strict` ; le Mac n'en garde que l'empreinte SHA-256, dans
+`~/.jarvis/devices.json` (lisible par toi seul). Seul le Mac peut créer un
+code ou retirer un appareil — pas un appareil déjà connecté, et pas une
+requête qui arrive par un relais local comme `tailscale serve`.
 
 ## Vérifier
 

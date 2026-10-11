@@ -11,7 +11,7 @@
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
 import { mkdtempSync, writeFileSync, chmodSync, existsSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -39,8 +39,11 @@ else:
 `);
 chmodSync(fake, 0o755);
 
-const srv = spawn("python3", [join(root, "hud/server.py"), "--port", String(port), "--vault", vault, "--no-auto"],
-  { env: { ...process.env, JARVIS_CLAUDE_BIN: fake }, stdio: ["ignore", "pipe", "pipe"] });
+const srv = spawn("python3", [join(root, "hud/server.py"), "--port", String(port), "--vault", vault, "--no-auto", "--partage"],
+  { env: { ...process.env, JARVIS_CLAUDE_BIN: fake, JARVIS_HOME: join(work, "home") }, stdio: ["ignore", "pipe", "pipe"] });
+// L'adresse réseau de cette machine : le « téléphone » passera par là, pas par 127.0.0.1.
+const lanIp = Object.values(networkInterfaces()).flat()
+  .find((i) => i && i.family === "IPv4" && !i.internal)?.address;
 let srvErr = "";
 srv.stderr.on("data", (d) => { srvErr += d; });
 const base = `http://127.0.0.1:${port}/`;
@@ -166,6 +169,76 @@ await check("cliquer un nœud du graphe ouvre sa note", async () => {
 });
 
 await page.screenshot({ path: join(shots, "hud-desktop.png") });
+
+if (lanIp) {
+  const phone = await browser.newContext({
+    viewport: { width: 402, height: 874 },
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile Safari/604.1",
+  });
+  const tel = await phone.newPage();
+  tel.on("pageerror", (e) => jsErrors.push("téléphone : " + e));
+  const telUrl = `http://${lanIp}:${port}/`;
+
+  await check("un appareil inconnu tombe sur l'écran d'appairage, rien d'autre", async () => {
+    await tel.goto(telUrl);
+    await tel.waitForSelector("#loginSheet:not([hidden])", { timeout: 6000 });
+    assert(await tel.inputValue("#pairName") === "iPhone", "nom de l'appareil non deviné");
+    assert(!(await tel.textContent("#log")).includes("Trois priorités"), "la console a fuité avant appairage");
+  });
+
+  await check("un code faux est refusé", async () => {
+    await page.click("#devBtn");
+    await page.waitForSelector("#bigCode");
+    const code = (await page.textContent("#bigCode")).trim();
+    await tel.fill("#pairCode", code === "000000" ? "111111" : "000000");
+    await tel.click('#loginForm button[type="submit"]');
+    await tel.waitForFunction(() => document.querySelector("#pairErr").textContent.includes("Code faux"));
+  });
+
+  await check("le Mac montre un code et l'adresse à ouvrir", async () => {
+    assert(/^\d{6}$/.test((await page.textContent("#bigCode")).trim()), "pas de code à 6 chiffres");
+    assert((await page.locator("#devBody code").count()) >= 1, "aucune adresse affichée");
+  });
+
+  await check("avec le bon code, le téléphone pilote Jarvis", async () => {
+    await tel.fill("#pairCode", (await page.textContent("#bigCode")).trim());
+    await tel.click('#loginForm button[type="submit"]');
+    await tel.waitForFunction(() => document.querySelector("#status").textContent === "ACTIF", null, { timeout: 8000 });
+    assert(await tel.isHidden("#loginSheet"), "l'écran d'appairage reste");
+    assert((await tel.textContent("#vitalList")).includes("iPhone"), "le nom de l'appareil n'apparaît pas");
+    await tel.fill("#cmd", "bonjour depuis le téléphone");
+    await tel.press("#cmd", "Enter");
+    await tel.waitForSelector("#log >> text=Réponse à : bonjour depuis le téléphone", { timeout: 8000 });
+  });
+
+  await check("le téléphone reste connecté après rechargement", async () => {
+    await tel.reload();
+    await tel.waitForFunction(() => document.querySelector("#status").textContent === "ACTIF");
+    assert(await tel.isHidden("#loginSheet"), "appairage perdu");
+  });
+
+  await check("le téléphone est installable sur l'écran d'accueil", async () => {
+    const m = await tel.evaluate(async () => (await fetch("/manifest.webmanifest")).json());
+    assert(m.display === "standalone" && m.icons.length, "manifeste incomplet");
+    const icon = await tel.evaluate(async () => (await fetch("/icon.png")).headers.get("content-type"));
+    assert(icon === "image/png", "icône absente");
+  });
+
+  await tel.screenshot({ path: join(shots, "hud-phone.png") });
+
+  await check("retirer l'appareil sur le Mac le déconnecte", async () => {
+    await page.click("#devClose");
+    await page.click("#devBtn");
+    await page.waitForSelector("[data-revoke]");
+    await page.click("[data-revoke]");
+    await page.click("#devClose");
+    await tel.reload();
+    await tel.waitForSelector("#loginSheet:not([hidden])", { timeout: 6000 });
+  });
+  await phone.close();
+} else {
+  console.log("(pas d'interface réseau : contrôles du téléphone sautés)");
+}
 await page.setViewportSize({ width: 402, height: 874 });
 await page.waitForTimeout(300);
 await check("sur téléphone, les panneaux s'empilent sans débordement horizontal", async () => {

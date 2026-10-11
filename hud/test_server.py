@@ -247,5 +247,152 @@ class HttpTest(unittest.TestCase):
         self.assertIn("Index", json.loads(data)["links"])
 
 
+class AccessTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.now = [1000.0]
+        self.access = server.Access(Path(self.tmp.name) / "devices.json", clock=lambda: self.now[0])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_pairing_gives_a_token_and_burns_the_code(self):
+        code, ttl = self.access.start_pairing()
+        self.assertRegex(code, r"^\d{6}$")
+        token, why = self.access.pair(code, "iPhone")
+        self.assertIsNone(why)
+        self.assertEqual(self.access.device_for(token)["name"], "iPhone")
+        self.assertEqual(self.access.pair(code, "Intrus"), (None, "Aucun code actif — affiches-en un sur le Mac."))
+
+    def test_only_the_digest_is_stored(self):
+        code, _ = self.access.start_pairing()
+        token, _ = self.access.pair(code, "PC")
+        stored = (Path(self.tmp.name) / "devices.json").read_text()
+        self.assertNotIn(token, stored)
+        self.assertEqual(oct((Path(self.tmp.name) / "devices.json").stat().st_mode & 0o777), "0o600")
+        again = server.Access(Path(self.tmp.name) / "devices.json")  # survit au redémarrage
+        self.assertIsNotNone(again.device_for(token))
+
+    def test_odd_input_is_just_a_wrong_code(self):
+        self.access.start_pairing()
+        self.assertEqual(self.access.pair("é12345", "x"), (None, "Code faux."))
+        self.assertEqual(self.access.pair(None, "x"), (None, "Code faux."))
+
+    def test_code_expires(self):
+        code, ttl = self.access.start_pairing()
+        self.now[0] += ttl + 1
+        self.assertIsNone(self.access.pair(code, "x")[0])
+
+    def test_five_wrong_tries_kill_the_code(self):
+        code, _ = self.access.start_pairing()
+        wrong = f"{(int(code) + 1) % 10 ** 6:06d}"
+        for _ in range(server.Access.MAX_TRIES):
+            self.assertIsNone(self.access.pair(wrong, "x")[0])
+        self.assertIsNone(self.access.pair(code, "x")[0])  # même le bon ne passe plus
+
+    def test_revoke(self):
+        code, _ = self.access.start_pairing()
+        token, _ = self.access.pair(code, "Vieux PC")
+        device_id = self.access.listing()[0]["id"]
+        self.assertTrue(self.access.revoke(device_id))
+        self.assertIsNone(self.access.device_for(token))
+        self.assertIsNone(self.access.device_for(""))
+
+    def test_corrupt_file_degrades_to_no_device(self):
+        path = Path(self.tmp.name) / "abime.json"
+        path.write_text("{pas du json")
+        self.assertEqual(server.Access(path).listing(), [])
+
+    def test_icon_is_a_valid_png(self):
+        png = server.orb_png(32)
+        self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertTrue(png.endswith(b"IEND\xaeB`\x82"))
+
+
+def lan_ip():
+    """Une adresse non locale de cette machine, pour jouer « l'autre appareil »."""
+    import socket
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("10.255.255.255", 1))
+        ip = probe.getsockname()[0]
+        probe.close()
+        return None if ip.startswith("127.") else ip
+    except OSError:
+        return None
+
+
+@unittest.skipUnless(lan_ip(), "aucune interface réseau hors boucle locale")
+class SharedHttpTest(unittest.TestCase):
+    """Le HUD ouvert au réseau, vu par un vrai client qui n'est pas le Mac."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        vault = server.Vault(Path(cls.tmp.name) / "coffre")
+        vault.ensure()
+        cls.access = server.Access(Path(cls.tmp.name) / "devices.json")
+        cls.jarvis = server.Jarvis(vault, FakeEngine("Bien reçu."))
+        cls.httpd = ThreadingHTTPServer(("0.0.0.0", 0), lambda *a: None)
+        cls.port = cls.httpd.server_address[1]
+        cls.httpd.RequestHandlerClass = server.make_handler(cls.jarvis, cls.port, cls.access, ["http://test/"])
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        cls.ip = lan_ip()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        cls.tmp.cleanup()
+
+    def request(self, method, path, body=None, headers=None, remote=True):
+        target = self.ip if remote else "127.0.0.1"
+        conn = http.client.HTTPConnection(target, self.port, timeout=5)
+        hdrs = {"Host": f"{target}:{self.port}"}
+        if method == "POST":
+            hdrs.update({"Content-Type": "application/json", "X-Jarvis": "1"})
+        hdrs.update(headers or {})
+        conn.request(method, path, body=json.dumps(body) if body is not None else None, headers=hdrs)
+        resp = conn.getresponse()
+        data, cookie = resp.read(), resp.getheader("Set-Cookie")
+        conn.close()
+        return resp.status, data, cookie
+
+    def test_a_stranger_sees_only_the_login_page(self):
+        self.assertEqual(self.request("GET", "/")[0], 200)
+        self.assertEqual(self.request("GET", "/icon.png")[0], 200)
+        status, data, _ = self.request("GET", "/api/state")
+        self.assertEqual((status, json.loads(data)["pair"]), (401, True))
+        self.assertEqual(self.request("GET", "/api/note?name=Jarvis")[0], 401)
+        self.assertEqual(self.request("POST", "/api/command", {"text": "/plan"})[0], 401)
+        # …et ne peut ni fabriquer un code ni lister les appareils.
+        self.assertEqual(self.request("POST", "/api/pair/start", {})[0], 401)
+
+    def test_pairing_opens_everything_but_owner_actions(self):
+        status, data, _ = self.request("POST", "/api/pair/start", {}, remote=False)
+        code = json.loads(data)["code"]
+        status, _, cookie = self.request("POST", "/api/pair", {"code": code, "name": "iPhone"})
+        self.assertEqual(status, 200)
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=Strict", cookie)
+        jar = {"Cookie": cookie.split(";")[0]}
+        status, data, _ = self.request("GET", "/api/state", headers=jar)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data)["access"]["device"], "iPhone")
+        self.assertEqual(json.loads(data)["access"]["urls"], [])
+        status, data, _ = self.request("POST", "/api/command", {"text": "bonjour"}, headers=jar)
+        self.assertEqual(json.loads(data)["output"], "Bien reçu.")
+        self.assertEqual(self.request("POST", "/api/pair/start", {}, headers=jar)[0], 403)
+        self.assertEqual(self.request("GET", "/api/devices", headers=jar)[0], 403)
+        # Un jeton inventé ne vaut rien.
+        self.assertEqual(self.request("GET", "/api/state", headers={"Cookie": "jarvis_device=faux"})[0], 401)
+
+    def test_loopback_with_a_foreign_host_is_not_the_owner(self):
+        # Ce que voit le serveur derrière `tailscale serve`, ou lors d'un rebinding DNS.
+        status, _, _ = self.request("GET", "/api/state", headers={"Host": "mac.tailnet.ts.net"}, remote=False)
+        self.assertEqual(status, 401)
+        self.assertEqual(self.request("GET", "/api/state", remote=False)[0], 200)
+
+
 if __name__ == "__main__":
     unittest.main()
