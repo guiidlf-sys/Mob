@@ -12,3 +12,14 @@ memory.json
 worker/.dev.vars
 worker/node_modules/
 worker/.wrangler/
+
+# Coffre de Jarvis : la structure est versionnée, le contenu jamais.
+# Le dépôt est public — briefings, mails résumés, priorités et réflexions
+# sont personnels. Ils vivent sur la machine (ou dans un coffre Obsidian
+# synchronisé, via JARVIS_VAULT), pas sur GitHub.
+vault/raw/*
+vault/wiki/*
+vault/outputs/*
+!vault/*/.gitkeep
+vault/.obsidian/
+vault/.trash/

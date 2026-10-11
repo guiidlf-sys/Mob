@@ -2,11 +2,12 @@
   "name": "mob",
   "version": "1.0.0",
   "private": true,
-  "description": "Outillage de vérification de la web app Mob (docs/index.html).",
+  "description": "Outillage de vérification de la web app Mob (docs/index.html) et du HUD de Jarvis (hud/).",
   "type": "module",
   "scripts": {
     "check": "node tests/ui-check.mjs",
-    "check:local": "node tests/ui-check.mjs http://localhost:8899/"
+    "check:local": "node tests/ui-check.mjs http://localhost:8899/",
+    "check:hud": "node tests/hud-check.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1"

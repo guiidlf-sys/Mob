@@ -10,6 +10,10 @@ réellement installable. Chacune a son dossier et son guide.
 | Raccourci Siri | `shortcut/` | 📝 guide écrit | 5 min dans l'app Raccourcis |
 | App iOS native | `mobile/` | ✅ compile (CI verte) | Xcode + Mac, et 99 $/an pour la voix |
 | Cœur Python | racine | ✅ testé pour de vrai | Python 3.9+ et Ollama |
+| **Jarvis OS** (HUD + skills + coffre) | `hud/`, `.claude/skills/`, `vault/` | ✅ testé avec le vrai Claude Code | un Mac, Python 3.9+, Claude Code |
+
+Jarvis OS — moteur, mémoire, voix, visage — est décrit étape par étape
+dans [`hud/README.md`](hud/README.md).
 
 Le contexte complet du projet — décisions prises, limites rencontrées,
 conventions — est dans [`CLAUDE.md`](CLAUDE.md).
