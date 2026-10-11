@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a090d">
+<title>Jarvis HUD</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a090d%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%277%27 fill=%27%23d9825b%27/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0a090d;
+    --panel: #110f15;
+    --line: #26212b;
+    --line-hi: #3a3140;
+    --ink: #e9e2d8;
+    --dim: #8c8291;
+    --faint: #5a5160;
+    --accent: #d9825b;
+    --accent-hi: #f0a27c;
+    --gold: #e8b65c;
+    --ok: #8fc79a;
+    --bad: #e2706a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 var(--mono); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  .hud { display: grid; height: 100vh; height: 100dvh; padding: 12px; gap: 10px;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 340px);
+    grid-template-rows: auto minmax(0, 1.15fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top top top"
+      "vitals core audio"
+      "agenda console vault"
+      "pipe pipe pipe"; }
+
+  header.top { grid-area: top; display: flex; align-items: center; gap: 18px;
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); letter-spacing: .08em; text-transform: uppercase;
+    font-size: 11px; color: var(--dim); }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: #3a3540; }
+  .brand { color: var(--ink); font-weight: 700; letter-spacing: .3em; }
+  .top .grow { flex: 1; }
+  .top b { color: var(--accent); font-weight: 500; }
+  .top .bad { color: var(--bad); }
+  #clock { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .panel { position: relative; min-height: 0; display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    padding: 12px 14px; overflow: hidden; }
+  .panel::before, .panel::after { content: ""; position: absolute; width: 10px; height: 10px;
+    border: 1px solid var(--accent); opacity: .55; pointer-events: none; }
+  .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: 10px; }
+  .panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: 10px; }
+  .panel h2 { margin: 0 0 10px; font-size: 10.5px; font-weight: 500; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 8px; }
+  .panel h2 span:last-child { color: var(--faint); }
+  .scroll { overflow: auto; min-height: 0; flex: 1; scrollbar-width: thin;
+    scrollbar-color: var(--line-hi) transparent; }
+
+  /* VITALS */
+  #vitals { grid-area: vitals; }
+  .vital { display: grid; grid-template-columns: 70px 1fr 52px; align-items: center;
+    gap: 10px; margin: 7px 0; }
+  .vital label { color: var(--dim); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+  .vital .bar { height: 6px; background: #1d1922; border-radius: 3px; overflow: hidden; }
+  .vital .bar i { display: block; height: 100%; width: 0; background: var(--accent);
+    transition: width .6s ease; }
+  .vital .bar i.warn { background: var(--bad); }
+  .vital output { text-align: right; font-variant-numeric: tabular-nums; }
+  #spark { width: 100%; height: 64px; display: block; margin-top: 10px; }
+  .kv { display: flex; justify-content: space-between; color: var(--dim); font-size: 11.5px;
+    border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 6px; gap: 10px; }
+  .kv span:last-child { color: var(--ink); text-align: right; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+
+  /* CORE */
+  #core { grid-area: core; padding: 0; }
+  #core h2 { position: absolute; top: 12px; left: 14px; right: 14px; z-index: 1; }
+  #graph { width: 100%; height: 100%; display: block; }
+  .core-foot { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex;
+    justify-content: space-between; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--dim); pointer-events: none; }
+  .core-foot b { color: var(--accent); font-weight: 500; }
+  #nodeTip { position: absolute; pointer-events: none; padding: 3px 8px; border-radius: 4px;
+    background: rgba(10,9,13,.9); border: 1px solid var(--line-hi); color: var(--ink);
+    font-size: 11px; transform: translate(-50%, -140%); white-space: nowrap; z-index: 2; }
+
+  /* AGENDA */
+  #agenda { grid-area: agenda; }
+  .slot { display: grid; grid-template-columns: 52px 14px 1fr; gap: 8px; padding: 5px 0;
+    border-bottom: 1px solid var(--line); align-items: start; }
+  .slot time { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .slot .st { margin-top: 5px; width: 8px; height: 8px; border-radius: 50%;
+    border: 1px solid var(--faint); }
+  .slot.done .st { background: var(--ok); border-color: var(--ok); }
+  .slot.now .st { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,130,91,.2); }
+  .slot b { font-weight: 500; }
+  .slot small { display: block; color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot > button { min-width: 0; }
+  .slot button { background: none; border: 0; padding: 0; text-align: left; }
+  .slot button:hover b { color: var(--accent-hi); }
+  #top3 { margin: 0 0 6px; padding: 8px 10px; border: 1px solid var(--line-hi); border-radius: 8px; background: #0d0b10; list-style: none; counter-reset: t; }
+  #top3 li { counter-increment: t; display: flex; gap: 8px; padding: 3px 0; }
+  #top3 li::before { content: counter(t) "."; color: var(--accent); }
+  .muted { color: var(--faint); }
+
+  /* CONSOLE */
+  #console { grid-area: console; }
+  #log { font-size: 12.5px; }
+  .line { padding: 3px 0; white-space: pre-wrap; word-break: break-word; }
+  .line .who { color: var(--accent); }
+  .line.me .who { color: var(--gold); }
+  .line.err { color: var(--bad); }
+  .line.sys { color: var(--dim); }
+  .line .tag { color: var(--faint); font-size: 11px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .quick button, .btn { border: 1px solid var(--line-hi); background: #17141b; border-radius: 6px;
+    padding: 4px 9px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .quick button:hover, .btn:hover { color: var(--ink); border-color: var(--accent); }
+  .btn.on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  form.cmd { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-hi);
+    border-radius: 8px; padding: 6px 8px 6px 12px; background: #0d0b10; }
+  form.cmd:focus-within { border-color: var(--accent); }
+  form.cmd .prompt { color: var(--accent); }
+  form.cmd input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; }
+  .icon { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line-hi);
+    background: #17141b; display: grid; place-items: center; padding: 0; color: var(--dim); }
+  .icon:hover { color: var(--ink); border-color: var(--accent); }
+  .icon.live { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .icon svg { width: 15px; height: 15px; }
+
+  /* AUDIO */
+  #audio { grid-area: audio; }
+  .meter { display: flex; align-items: flex-end; gap: 3px; flex: 1; min-height: 54px; max-height: 140px; margin: 4px 0 10px; }
+  .meter i { flex: 1; background: #221d27; border-radius: 2px; height: 8%; transition: height .08s; }
+  .meter.in i { background: var(--accent); }
+  .meter.out i { background: var(--gold); }
+  .io { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+    padding: 6px 0; border-top: 1px solid var(--line); }
+  .io small { display: block; color: var(--dim); font-size: 11px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  #heard { color: var(--dim); min-height: 1.5em; font-size: 12px; margin-top: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* VAULT */
+  #vault { grid-area: vault; }
+  .counts { display: flex; gap: 6px; margin-bottom: 8px; }
+  .counts span { flex: 1; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
+    text-align: center; font-size: 11px; color: var(--dim); }
+  .counts b { display: block; font-size: 15px; color: var(--ink); font-weight: 500; }
+  #vaultSearch { width: 100%; background: #0d0b10; border: 1px solid var(--line-hi);
+    border-radius: 6px; padding: 5px 9px; outline: none; margin-bottom: 6px; }
+  #vaultSearch:focus { border-color: var(--accent); }
+  .note-row { display: block; width: 100%; text-align: left; background: none; border: 0;
+    padding: 4px 0; border-bottom: 1px solid var(--line); color: var(--ink); }
+  .note-row:hover { color: var(--accent-hi); }
+  .note-row small { display: block; color: var(--faint); font-size: 11px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  #noteView { white-space: pre-wrap; word-break: break-word; font-size: 12px; color: #cfc7bd; }
+  #noteView .wl { color: var(--accent); background: none; border: 0; padding: 0;
+    text-decoration: underline dotted; }
+  .note-head { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    margin-bottom: 6px; }
+  .note-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* PIPELINE */
+  footer.pipe { grid-area: pipe; display: flex; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); overflow: hidden; }
+  .stage { flex: 1; padding: 8px 14px; letter-spacing: .16em; font-size: 11px; color: var(--faint);
+    border-right: 1px solid var(--line); transition: color .2s, background .2s; }
+  .stage:last-child { border-right: 0; }
+  .stage small { display: block; letter-spacing: .04em; color: var(--faint); font-size: 10.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+  .stage.on { color: var(--accent); background: rgba(217,130,91,.07); }
+  .stage.on small { color: var(--dim); }
+
+  #offline { position: fixed; inset: auto 12px 64px auto; max-width: 360px; padding: 10px 14px;
+    border: 1px solid var(--bad); background: #1a0f10; border-radius: 8px; color: var(--ink); z-index: 5; }
+
+  @media (max-width: 900px) {
+    .hud { height: auto; min-height: 100vh;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 300px auto 420px auto auto 360px auto;
+      grid-template-areas: "top" "core" "vitals" "console" "audio" "agenda" "vault" "pipe"; }
+    header.top { flex-wrap: wrap; gap: 8px 14px; }
+    .stage { padding: 8px; letter-spacing: .08em; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="hud">
+  <header class="top">
+    <span class="dots"><i></i><i></i><i></i></span>
+    <span class="brand">JARVIS</span>
+    <span>Statut : <b id="status">—</b></span>
+    <span>Moteur : <b id="engine">—</b></span>
+    <span class="grow"></span>
+    <span id="date"></span>
+    <span id="clock">--:--:--</span>
+  </header>
+
+  <section class="panel" id="vitals">
+    <h2><span>Vitals</span><span id="host">—</span></h2>
+    <div class="scroll"><div id="vitalList"></div>
+      <canvas id="spark" aria-label="Charge CPU des dernières minutes"></canvas></div>
+  </section>
+
+  <section class="panel" id="core">
+    <h2><span>Memory graph</span><span id="graphCount">—</span></h2>
+    <canvas id="graph" aria-label="Graphe des notes du coffre"></canvas>
+    <div id="nodeTip" hidden></div>
+    <div class="core-foot"><span>Si ce n'est pas dans le coffre,</span><b>ça n'a pas eu lieu</b></div>
+  </section>
+
+  <section class="panel" id="audio">
+    <h2><span>Audio I/O</span><span id="voiceState">veille</span></h2>
+    <div class="meter in" id="meter" aria-hidden="true"></div>
+    <div class="io">
+      <button class="icon" id="micBtn" type="button" title="Parler (barre d’espace)" aria-label="Parler">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <div><b>Entrée</b><small id="micInfo">Dictée du navigateur</small></div>
+      <span class="muted" id="micLang">fr-FR</span>
+    </div>
+    <div class="io">
+      <button class="icon" id="stopBtn" type="button" title="Couper la voix" aria-label="Couper la voix">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6M21 9l-4 6"/></svg>
+      </button>
+      <div><b>Sortie</b><small id="ttsInfo">Synthèse vocale</small></div>
+      <span class="muted" id="ttsVoice">—</span>
+    </div>
+    <div class="toggles">
+      <button class="btn" type="button" id="tVoice" aria-pressed="false">Répondre à voix haute</button>
+      <button class="btn" type="button" id="tAuto" aria-pressed="false">Envoi auto</button>
+      <button class="btn" type="button" id="tRoutine" aria-pressed="false">Lire les routines</button>
+    </div>
+    <div id="heard"></div>
+  </section>
+
+  <section class="panel" id="agenda">
+    <h2><span>Agenda · top 3</span><span id="today">—</span></h2>
+    <div class="scroll">
+      <ol id="top3"></ol>
+      <div id="slots"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="console">
+    <h2><span>Commands</span><span id="busy">prêt</span></h2>
+    <div class="scroll" id="log" aria-live="polite"></div>
+    <div class="quick" id="quick"></div>
+    <form class="cmd" id="cmdForm" autocomplete="off">
+      <span class="prompt">&gt;</span>
+      <input id="cmd" type="text" placeholder="Parle ou tape une commande — /plan, « bilan : … », une question…" aria-label="Commande">
+      <button class="icon" id="micBtn2" type="button" aria-label="Dicter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <button class="icon" type="submit" aria-label="Envoyer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+  </section>
+
+  <section class="panel" id="vault">
+    <h2><span>Vault</span><span id="vaultTotal">—</span></h2>
+    <div class="counts">
+      <span><b id="cRaw">0</b>raw</span><span><b id="cWiki">0</b>wiki</span><span><b id="cOut">0</b>outputs</span>
+    </div>
+    <input id="vaultSearch" type="search" placeholder="Chercher dans le coffre…" aria-label="Chercher dans le coffre">
+    <div class="scroll" id="vaultList"></div>
+    <div class="scroll" id="noteBox" hidden>
+      <div class="note-head"><b id="noteName"></b><button class="btn" type="button" id="noteClose">Fermer</button></div>
+      <div id="noteView"></div>
+    </div>
+  </section>
+
+  <footer class="pipe">
+    <div class="stage" data-stage="speak">SPEAK<small>—</small></div>
+    <div class="stage" data-stage="route">ROUTE<small>—</small></div>
+    <div class="stage" data-stage="execute">EXECUTE<small>—</small></div>
+    <div class="stage" data-stage="remember">REMEMBER<small>—</small></div>
+  </footer>
+</div>
+<div id="offline" hidden>Serveur du HUD injoignable. Relance <code>python3 hud/server.py</code>.</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Préférences de l'écran : confort local, jamais indispensable.
+const prefs = (() => {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem("jarvis.hud") || "{}"); } catch (e) {}
+  return { get: (k, d) => (k in p ? p[k] : d), set: (k, v) => { p[k] = v; try { localStorage.setItem("jarvis.hud", JSON.stringify(p)); } catch (e) {} } };
+})();
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : {
+    method: "POST", body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json", "X-Jarvis": "1" },
+  };
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+/* ---------------------------------------------------------- pipeline */
+function stage(name, detail, on = true) {
+  const el = document.querySelector(`[data-stage="${name}"]`);
+  el.classList.toggle("on", on);
+  if (detail !== undefined) el.querySelector("small").textContent = detail;
+}
+function resetStages() { for (const s of ["speak", "route", "execute", "remember"]) stage(s, undefined, false); }
+
+/* ------------------------------------------------------------ horloge */
+const fmtDate = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+function tickClock() {
+  const d = new Date();
+  $("#clock").textContent = d.toLocaleTimeString("fr-FR");
+  $("#date").textContent = fmtDate.format(d);
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ------------------------------------------------------------ console */
+const log = $("#log");
+function line(kind, who, text, tag) {
+  const div = document.createElement("div");
+  div.className = "line " + kind;
+  div.innerHTML = (who ? `<span class="who">${esc(who)}</span> ` : "") + esc(text) + (tag ? ` <span class="tag">${esc(tag)}</span>` : "");
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+line("sys", "", "HUD prêt. Un écran, pas d'onglets. Parle, tape, ou laisse les routines tourner.");
+
+const QUICK = [["Briefing", "/inbox"], ["Plan", "/plan"], ["Chiffres", "/metrics"], ["Bilan", "/wrap"], ["Coffre", "/vault résume ce que tu sais de moi"]];
+for (const [label, cmd] of QUICK) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label; b.dataset.cmd = cmd;
+  b.addEventListener("click", () => send(cmd));
+  $("#quick").appendChild(b);
+}
+
+let pending = 0;
+const seenJobs = new Set();
+async function send(text) {
+  text = text.trim();
+  if (!text) return;
+  $("#cmd").value = "";
+  resetStages();
+  stage("speak", text.slice(0, 60));
+  line("me", "toi>", text);
+  stage("route", "…");
+  stage("execute", "en cours…");
+  pending++; $("#busy").textContent = "exécution…"; core.busy = true;
+  try {
+    const job = await api("/api/command", { text });
+    seenJobs.add(job.id);
+    stage("route", job.route === "auto" ? "Claude choisit la skill" : `skill · ${job.skill}`);
+    if (job.status === "error") {
+      stage("execute", "échec");
+      line("err", "jarvis>", job.output, job.skill);
+    } else {
+      stage("execute", "fait");
+      line("", "jarvis>", job.output, job.route === "auto" ? "" : job.skill);
+      speak(job.output, prefs.get("voice", false));
+    }
+    stage("remember", "journal du jour");
+    refresh(); loadGraph();
+  } catch (e) {
+    stage("execute", "injoignable");
+    line("err", "jarvis>", "Le serveur ne répond pas : " + e.message);
+  } finally {
+    pending--; if (!pending) { $("#busy").textContent = "prêt"; core.busy = false; }
+  }
+}
+$("#cmdForm").addEventListener("submit", (e) => { e.preventDefault(); send($("#cmd").value); });
+
+/* --------------------------------------------------------------- état */
+function bar(label, value, unit = "%", warnAt = 85) {
+  const known = typeof value === "number";
+  const pct = known ? Math.max(0, Math.min(100, value)) : 0;
+  return `<div class="vital"><label>${label}</label><div class="bar"><i class="${known && pct >= warnAt ? "warn" : ""}" style="width:${pct}%"></i></div><output>${known ? value.toFixed(0) + unit : "—"}</output></div>`;
+}
+function duration(s) {
+  if (typeof s !== "number") return "—";
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d} j ${h} h` : `${h} h ${String(m).padStart(2, "0")}`;
+}
+
+let lastState = null;
+const cpuHist = [];
+function drawSpark() {
+  const c = $("#spark"), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  c.width = r.width * dpr; c.height = r.height * dpr;
+  const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height - 14;
+  x.clearRect(0, 0, w, r.height);
+  x.fillStyle = "#5a5160"; x.font = "10px ui-monospace, Menlo, monospace";
+  x.fillText("CHARGE CPU · 5 MIN", 0, r.height - 2);
+  x.strokeStyle = "#26212b"; x.beginPath(); x.moveTo(0, h + .5); x.lineTo(w, h + .5); x.stroke();
+  if (cpuHist.length < 2) return;
+  const step = w / 59, pts = cpuHist.map((v, i) => [w - (cpuHist.length - 1 - i) * step, h - (v / 100) * (h - 4)]);
+  const grad = x.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "rgba(217,130,91,.35)"); grad.addColorStop(1, "rgba(217,130,91,0)");
+  x.beginPath(); x.moveTo(pts[0][0], h); pts.forEach((p) => x.lineTo(p[0], p[1])); x.lineTo(pts[pts.length - 1][0], h);
+  x.fillStyle = grad; x.fill();
+  x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo : x.moveTo).call(x, p[0], p[1]));
+  x.strokeStyle = "#d9825b"; x.lineWidth = 1.5; x.stroke();
+}
+async function refresh() {
+  let st;
+  try { st = await api("/api/state"); $("#offline").hidden = true; }
+  catch (e) { $("#offline").hidden = false; $("#status").textContent = "HORS LIGNE"; $("#status").className = "bad"; return; }
+  lastState = st;
+  $("#status").textContent = st.busy ? "EXÉCUTION" : "ACTIF";
+  $("#status").className = "";
+  $("#engine").textContent = st.engine.ok ? st.engine.detail : "indisponible";
+  $("#engine").className = st.engine.ok ? "" : "bad";
+  $("#engine").title = st.engine.detail;
+
+  const v = st.vitals;
+  $("#host").textContent = v.host || "—";
+  $("#vitalList").innerHTML =
+    bar("CPU", v.cpu) + bar("Mémoire", v.memory) + bar("Disque", v.disk) +
+    (typeof v.battery === "number" ? bar("Batterie", v.battery, "%", 101) : "") +
+    `<div class="kv"><span>Allumé depuis</span><span>${duration(v.uptime)}</span></div>` +
+    `<div class="kv"><span>Moteur</span><span>${esc(st.engine.detail)}</span></div>` +
+    `<div class="kv"><span>Coffre</span><span title="${esc(st.vault.path)}">${esc(st.vault.path)}</span></div>` +
+    `<div class="kv"><span>Échanges récents</span><span>${st.jobs.length}</span></div>`;
+
+  if (typeof v.cpu === "number") { cpuHist.push(v.cpu); if (cpuHist.length > 60) cpuHist.shift(); drawSpark(); }
+
+  const now = new Date();
+  const hm = now.getHours() * 60 + now.getMinutes();
+  const mins = st.agenda.map((a) => +a.time.slice(0, 2) * 60 + +a.time.slice(3));
+  $("#today").textContent = st.agenda.filter((a) => a.done).length + "/" + st.agenda.length;
+  $("#slots").innerHTML = st.agenda.map((a, i) => {
+    const isNow = !a.done && hm >= mins[i] && (i + 1 >= mins.length || hm < mins[i + 1]);
+    return `<div class="slot ${a.done ? "done" : ""} ${isNow ? "now" : ""}"><time>${a.time}</time><span class="st" title="${a.done ? "fait" : "à venir"}"></span>` +
+      `<button type="button" data-out="${esc(a.output)}" data-skill="${a.skill}" data-done="${a.done}"><b>${esc(a.label)}</b><small>${esc(a.say)}</small></button></div>`;
+  }).join("");
+  $("#top3").innerHTML = st.top3.length ? st.top3.map((t) => `<li>${esc(t.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (m, a, b) => b || a))}</li>`).join("")
+    : `<li class="muted" style="list-style:none">Pas encore de plan — dis « plan ».</li>`;
+
+  $("#cRaw").textContent = st.vault.counts.raw;
+  $("#cWiki").textContent = st.vault.counts.wiki;
+  $("#cOut").textContent = st.vault.counts.outputs;
+  $("#vaultTotal").textContent = st.vault.total + " notes";
+  if (!$("#vaultSearch").value.trim()) renderList(st.vault.recent.map((n) => ({ ...n, snippet: n.path })));
+
+  // Routines terminées pendant que l'écran était ouvert : on les affiche,
+  // et on les lit si l'utilisateur l'a demandé.
+  if (!refresh.primed) for (const job of st.jobs) {
+    if (job.status !== "done" && job.status !== "error") continue;
+    seenJobs.add(job.id);
+    line("me", job.source === "routine" ? "routine>" : "toi>", job.text || "/" + job.skill, job.started ? job.started.slice(11, 16) : "");
+    line(job.status === "error" ? "err" : "", "jarvis>", job.output, job.route === "auto" ? "" : job.skill);
+  }
+  for (const job of st.jobs) {
+    if (job.source !== "routine" || seenJobs.has(job.id) || job.status === "queued" || job.status === "running") continue;
+    seenJobs.add(job.id);
+    if (!refresh.primed) continue;
+    line(job.status === "error" ? "err" : "", "routine>", job.output, job.skill);
+    if (job.status !== "error") speak(job.output, prefs.get("routine", false));
+    loadGraph();
+  }
+  refresh.primed = true;
+  core.busy = st.busy || pending > 0;
+  $("#busy").textContent = core.busy ? "exécution…" : "prêt";
+}
+$("#slots").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.done === "true") openNote(b.dataset.out);
+  else send("/" + b.dataset.skill);
+});
+
+/* -------------------------------------------------------------- coffre */
+function renderList(items) {
+  $("#vaultList").innerHTML = items.length ? items.map((n) =>
+    `<button class="note-row" type="button" data-path="${esc(n.path)}">${esc(n.name)}<small>${esc(n.snippet || n.path)}</small></button>`).join("")
+    : `<div class="muted">Rien trouvé.</div>`;
+}
+$("#vaultList").addEventListener("click", (e) => { const b = e.target.closest("[data-path]"); if (b) openNote(b.dataset.path); });
+let searchTimer;
+$("#vaultSearch").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const q = $("#vaultSearch").value.trim();
+    if (!q) { refresh(); return; }
+    try { renderList(await api("/api/search?q=" + encodeURIComponent(q))); } catch (e) {}
+  }, 200);
+});
+async function openNote(path, byName) {
+  let note;
+  try { note = await api(byName ? "/api/note?name=" + encodeURIComponent(path) : "/api/note?path=" + encodeURIComponent(path)); }
+  catch (e) { line("sys", "", `Note introuvable : ${path}`); return; }
+  $("#noteName").textContent = note.path;
+  $("#noteView").innerHTML = esc(note.content).replace(/\[\[([^\]|#^]+)([^\]]*)\]\]/g,
+    (m, name) => `<button type="button" class="wl" data-name="${name.trim()}">${name.trim()}</button>`);
+  $("#vaultList").hidden = true; $("#noteBox").hidden = false;
+  core.focus = note.path;
+}
+$("#noteView").addEventListener("click", (e) => { const b = e.target.closest(".wl"); if (b) openNote(b.dataset.name, true); });
+$("#noteClose").addEventListener("click", () => { $("#noteBox").hidden = true; $("#vaultList").hidden = false; core.focus = null; });
+
+/* ------------------------------------------------------- graphe 3D */
+const canvas = $("#graph"), ctx = canvas.getContext("2d");
+const core = { nodes: [], edges: [], dust: [], dustEdges: [], angle: 0, busy: false, focus: null, hover: -1, proj: [] };
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+function seeded(seed) { let x = seed * 1e9 | 0 || 1; return () => ((x = Math.imul(x ^ x >>> 15, 2246822507) ^ Math.imul(x ^ x >>> 13, 3266489909)) >>> 0) / 4294967296; }
+function onEllipsoid(rand, r) {
+  const u = rand() * 2 - 1, t = rand() * Math.PI * 2, k = Math.sqrt(1 - u * u), m = r * Math.cbrt(rand());
+  return [Math.cos(t) * k * m * 1.35, u * m * 0.8, Math.sin(t) * k * m];
+}
+// Poussière décorative autour des vraies notes : elle donne sa forme au nuage,
+// mais elle n'est jamais cliquable ni comptée.
+(function makeDust() {
+  const rand = seeded(0.4242);
+  for (let i = 0; i < 170; i++) core.dust.push(onEllipsoid(rand, 1));
+  for (let i = 0; i < core.dust.length; i++) {
+    const d = core.dust.map((p, j) => [j, (p[0] - core.dust[i][0]) ** 2 + (p[1] - core.dust[i][1]) ** 2 + (p[2] - core.dust[i][2]) ** 2])
+      .filter(([j]) => j !== i).sort((a, b) => a[1] - b[1]);
+    for (const [j] of d.slice(0, 2)) if (i < j) core.dustEdges.push([i, j]);
+  }
+})();
+async function loadGraph() {
+  let g;
+  try { g = await api("/api/graph"); } catch (e) { return; }
+  const pos = g.nodes.map((n) => onEllipsoid(seeded(hash(n.path)), 1));
+  // Quelques passes de ressorts : les notes liées se rapprochent, comme dans Obsidian.
+  for (let it = 0; it < 12; it++) for (const [a, b] of g.edges) for (let k = 0; k < 3; k++) {
+    const d = pos[b][k] - pos[a][k]; pos[a][k] += d * 0.02; pos[b][k] -= d * 0.02;
+  }
+  // …sans s'effondrer en une boule : un peu de répulsion entre toutes les notes.
+  for (let it = 0; it < 30; it++) for (let a = 0; a < pos.length; a++) for (let b = a + 1; b < pos.length; b++) {
+    const d = [0, 1, 2].map((k) => pos[b][k] - pos[a][k]), r2 = d[0] ** 2 + d[1] ** 2 + d[2] ** 2 + 1e-4;
+    if (r2 > 0.25) continue;
+    for (let k = 0; k < 3; k++) { const f = d[k] * 0.004 / r2; pos[a][k] -= f; pos[b][k] += f; }
+  }
+  core.nodes = g.nodes.map((n, i) => ({ ...n, p: pos[i] }));
+  core.edges = g.edges;
+  $("#graphCount").textContent = `${g.nodes.length} notes · ${g.edges.length} liens`;
+}
+function resize() {
+  const r = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.max(1, r.width * dpr); canvas.height = Math.max(1, r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function draw(t) {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width < 2) resize();
+  ctx.clearRect(0, 0, w, h);
+  core.angle += reduced ? 0 : (core.busy ? 0.012 : 0.003);
+  const cx = w / 2, cy = h / 2 + 4, scale = Math.min(w / 3.2, h / 2.2);
+  const ca = Math.cos(core.angle), sa = Math.sin(core.angle), tilt = 0.32, ct = Math.cos(tilt), st = Math.sin(tilt);
+  const pulse = core.busy ? 0.75 + 0.25 * Math.sin(t / 180) : 1;
+  const project = (p) => {
+    const x = p[0] * ca - p[2] * sa, z0 = p[0] * sa + p[2] * ca;
+    const y = p[1] * ct - z0 * st, z = p[1] * st + z0 * ct;
+    const f = 2.6 / (2.6 + z);
+    return [cx + x * scale * f, cy + y * scale * f, f, z];
+  };
+  // halo
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, scale * 1.2);
+  g.addColorStop(0, `rgba(217,130,91,${0.16 * pulse})`); g.addColorStop(1, "rgba(217,130,91,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "lighter";
+  const dp = core.dust.map(project);
+  ctx.lineWidth = 0.6;
+  for (const [a, b] of core.dustEdges) {
+    ctx.strokeStyle = `rgba(217,130,91,${0.10 * pulse * dp[a][2]})`;
+    ctx.beginPath(); ctx.moveTo(dp[a][0], dp[a][1]); ctx.lineTo(dp[b][0], dp[b][1]); ctx.stroke();
+  }
+  for (const p of dp) { ctx.fillStyle = `rgba(232,160,120,${0.35 * p[2]})`; ctx.fillRect(p[0] - 0.8, p[1] - 0.8, 1.6, 1.6); }
+  const np = core.nodes.map((n) => project(n.p));
+  core.proj = np;
+  ctx.lineWidth = 1;
+  for (const [a, b] of core.edges) {
+    ctx.strokeStyle = `rgba(240,170,120,${0.45 * pulse})`;
+    ctx.beginPath(); ctx.moveTo(np[a][0], np[a][1]); ctx.lineTo(np[b][0], np[b][1]); ctx.stroke();
+  }
+  core.nodes.forEach((n, i) => {
+    const p = np[i], r = (3 + Math.min(6, n.degree) * 0.8) * p[2];
+    const hot = i === core.hover || n.path === core.focus;
+    const col = n.folder === "outputs" ? "232,182,92" : n.folder === "raw" ? "200,190,180" : "240,150,105";
+    ctx.fillStyle = `rgba(${col},${hot ? 0.35 : 0.14 * pulse})`;
+    ctx.beginPath(); ctx.arc(p[0], p[1], r * 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(${hot ? "255,240,225" : col},${0.95})`;
+    ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalCompositeOperation = "source-over";
+  if (core.hover >= 0 && np[core.hover]) {
+    const tip = $("#nodeTip");
+    tip.style.left = np[core.hover][0] + "px"; tip.style.top = (np[core.hover][1] + 30) + "px";
+  }
+  requestAnimationFrame(draw);
+}
+function nodeAt(e) {
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = -1, bd = 14 * 14;
+  core.proj.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+canvas.addEventListener("mousemove", (e) => {
+  core.hover = nodeAt(e);
+  const tip = $("#nodeTip");
+  tip.hidden = core.hover < 0;
+  if (core.hover >= 0) tip.textContent = core.nodes[core.hover].path;
+  canvas.style.cursor = core.hover >= 0 ? "pointer" : "default";
+});
+canvas.addEventListener("mouseleave", () => { core.hover = -1; $("#nodeTip").hidden = true; });
+canvas.addEventListener("click", (e) => { const i = nodeAt(e); if (i >= 0) openNote(core.nodes[i].path); });
+
+/* -------------------------------------------------------------- audio */
+const meter = $("#meter");
+for (let i = 0; i < 28; i++) meter.appendChild(document.createElement("i"));
+const bars = [...meter.children];
+function setMeter(levels, cls) {
+  meter.className = "meter " + cls;
+  bars.forEach((b, i) => { b.style.height = Math.max(8, Math.min(100, levels[i] || 0)) + "%"; });
+}
+
+function toggle(id, key, def) {
+  const b = $(id), apply = () => { const on = prefs.get(key, def); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); };
+  b.addEventListener("click", () => { prefs.set(key, !prefs.get(key, def)); apply(); });
+  apply();
+}
+toggle("#tVoice", "voice", false);
+toggle("#tAuto", "auto", true);
+toggle("#tRoutine", "routine", false);
+
+// Sortie : la synthèse vocale du système. Les voix arrivent parfois en retard.
+const synth = window.speechSynthesis;
+let voice = null, speakTimer = null;
+function pickVoice() {
+  if (!synth) return;
+  const vs = synth.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith("fr"));
+  voice = vs.find((v) => /premium|enhanced|amélioré/i.test(v.name)) || vs[0] || null;
+  $("#ttsVoice").textContent = voice ? voice.name.split(" ")[0] : (synth.getVoices().length ? "pas de voix fr" : "—");
+}
+if (synth) { pickVoice(); synth.addEventListener?.("voiceschanged", pickVoice); }
+else { $("#ttsInfo").textContent = "Indisponible dans ce navigateur"; }
+function speak(text, wanted) {
+  if (!wanted || !synth || !text) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/[#*_`>|]/g, " ").replace(/\[\[([^\]]+)\]\]/g, "$1").slice(0, 1500));
+  u.lang = "fr-FR"; if (voice) u.voice = voice;
+  u.onstart = () => {
+    $("#voiceState").textContent = "parle";
+    clearInterval(speakTimer);
+    speakTimer = setInterval(() => setMeter(bars.map((_, i) => 20 + 60 * Math.abs(Math.sin(Date.now() / 120 + i * 0.7)) * Math.random()), "out"), 90);
+  };
+  u.onend = u.onerror = () => { clearInterval(speakTimer); setMeter([], "in"); $("#voiceState").textContent = "veille"; };
+  synth.speak(u);
+}
+$("#stopBtn").addEventListener("click", () => { synth && synth.cancel(); });
+
+// Entrée : la dictée du navigateur, et le niveau réel du micro pendant l'écoute.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, stream = null, audioCtx = null, raf = 0;
+if (!SR) {
+  $("#micInfo").textContent = "Dictée indisponible ici — Dun au clavier de l'iPhone, ou Chrome / Safari";
+}
+async function startMeter() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = audioCtx.createAnalyser(); an.fftSize = 64;
+    audioCtx.createMediaStreamSource(stream).connect(an);
+    const data = new Uint8Array(an.frequencyBinCount);
+    const loop = () => { an.getByteFrequencyData(data); setMeter(bars.map((_, i) => data[i % data.length] / 2.55), "in"); raf = requestAnimationFrame(loop); };
+    loop();
+  } catch (e) { /* le niveau est un plus : la dictée marche sans lui */ }
+}
+function stopMeter() {
+  cancelAnimationFrame(raf);
+  stream && stream.getTracks().forEach((t) => t.stop());
+  audioCtx && audioCtx.close().catch(() => {});
+  stream = audioCtx = null; setMeter([], "in");
+}
+function listen() {
+  if (!SR) { line("sys", "", "La dictée n'existe pas dans ce navigateur. Sur l'iPhone : le clavier Dun dans le champ de commande."); $("#cmd").focus(); return; }
+  if (listening) { rec && rec.stop(); return; }
+  synth && synth.cancel();
+  rec = new SR(); rec.lang = "fr-FR"; rec.interimResults = true; rec.continuous = false;
+  let finalText = "";
+  rec.onstart = () => { listening = true; $("#micBtn").classList.add("live"); $("#micBtn2").classList.add("live"); $("#voiceState").textContent = "écoute"; resetStages(); stage("speak", "écoute…"); startMeter(); };
+  rec.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript; else interim += e.results[i][0].transcript;
+    }
+    $("#cmd").value = (finalText + interim).trim();
+    $("#heard").textContent = "« " + (finalText + interim).trim() + " »";
+  };
+  rec.onerror = (e) => { if (e.error !== "no-speech" && e.error !== "aborted") line("err", "micro>", "Dictée : " + e.error); };
+  rec.onend = () => {
+    listening = false; $("#micBtn").classList.remove("live"); $("#micBtn2").classList.remove("live"); $("#voiceState").textContent = "veille"; stopMeter();
+    const said = finalText.trim();
+    if (said && prefs.get("auto", true)) send(said);
+    else if (!said) stage("speak", "rien entendu", false);
+  };
+  rec.start();
+}
+$("#micBtn").addEventListener("click", listen);
+$("#micBtn2").addEventListener("click", listen);
+// Barre d'espace maintenue hors du champ : parler sans viser le bouton.
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !e.repeat && !["INPUT", "TEXTAREA", "BUTTON"].includes(document.activeElement.tagName)) { e.preventDefault(); listen(); }
+});
+
+/* ---------------------------------------------------------- démarrage */
+setMeter([], "in");
+resize();
+refresh(); loadGraph();
+setInterval(refresh, 5000);
+setInterval(loadGraph, 30000);
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

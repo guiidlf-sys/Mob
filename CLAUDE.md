@@ -92,8 +92,8 @@ identifiant Apple dans Xcode → Settings → Accounts, et accepter
   `eval()` brut).
 - **Étape 4 — faite** : validation contre un vrai serveur Ollama (voir
   section ci-dessus) — aucun écart de schéma, aucune correction nécessaire.
-- **Étape 5 — à faire** : orchestration multi-outils (au-delà de la seule
-  calculatrice — ex. lecture de fichier, recherche web).
+- **Étape 5 — faite autrement** : l'orchestration multi-outils passe par
+  Jarvis OS (Claude Code + skills, voir plus bas), pas par `jarvis.py`.
 - **Piste mobile (iPhone) — scaffold écrit, non compilé** : app SwiftUI
   dans `mobile/Mob/` qui porte les mêmes conventions (safe-eval,
   dégradation propre) sur iOS, et déclenchement vocal via App
@@ -404,6 +404,47 @@ terminer par une sauvegarde (commit + push) et lui redonner l'adresse
 **https://guiidlf-sys.github.io/Mob/**. Rappel : Pages sert depuis
 `main`, donc une modification n'atteint le site qu'une fois la pull
 request fusionnée.
+
+## Jarvis OS — HUD, skills, coffre
+
+Suivi d'un tutoriel « Build your Jarvis OS » en 4 pièces envoyé en
+captures par l'utilisateur. Guide complet : `hud/README.md`.
+
+- **Cerveau** : 5 skills dans `.claude/skills/` (`inbox`, `plan`,
+  `metrics`, `vault`, `wrap`) — une skill, un rôle. Aucune n'invente un
+  mail, un chiffre ou un souvenir : une source absente s'écrit telle.
+- **Mémoire** : `vault/` (raw/wiki/outputs), Markdown lié `[[...]]`,
+  compatible Obsidian. **Le contenu est ignoré par git** : dépôt public.
+  Ne le versionne jamais, même « pour tester ». Conséquence assumée : en
+  session cloud, le coffre repart vide ; sa place est sur le Mac.
+- **Voix** : Dun est une app iPhone — à l'utilisateur de l'installer.
+- **Visage** : `hud/server.py` (stdlib) + `hud/index.html`, un écran
+  sans onglets. Le serveur lance `claude -p` (stdin = prompt,
+  `--permission-mode acceptEdits`, outils sans Bash, `--add-dir` coffre)
+  ou Ollama, et lance seul les routines 7/9/14/19 h, **une fois, dans
+  leur fenêtre**.
+
+Testé pour de vrai dans le conteneur : via le HUD, le vrai Claude Code a
+exécuté `/plan` en 19 s (plan au bon format, top 3 relu par le HUD) et a
+routé seul « souviens-toi que… » vers la skill `vault` (note créée et
+liée). `claude -p` charge bien les skills du dépôt en mode non
+interactif. **Pas testé sur un Mac** : mesures `vm_stat`/`pmset`, plist
+launchd, dictée Safari.
+
+Sécurité du serveur, à ne pas affaiblir : écoute `127.0.0.1` seulement,
+refuse un `Host` étranger (rebinding DNS), exige l'en-tête `X-Jarvis`
+sur POST (pas de CSRF par formulaire), `Vault.resolve` empêche de sortir
+du coffre.
+
+Pièges rencontrés : `pkill -f "hud/server.py"` se tue lui-même (le motif
+est dans sa propre ligne de commande). Et encore une fois, les captures
+ont montré ce que 15 contrôles verts ne voyaient pas : top 3 coupé, notes
+tassées au centre du graphe par des ressorts trop forts, console vide
+après rechargement.
+
+Vérifier : `python3 -m unittest hud/test_server.py` et
+`node tests/hud-check.mjs` (vrai navigateur, faux `claude`), aussi en CI
+(`.github/workflows/hud-check.yml`).
 
 ## Conventions établies
 

@@ -1,0 +1,49 @@
+name: Vérification du HUD de Jarvis
+
+# Le HUD tourne sur le Mac de l'utilisateur, pas en ligne : on vérifie donc
+# le code du dépôt. Un faux `claude` remplace le moteur — aucun jeton
+# dépensé, aucun secret nécessaire.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'hud/**'
+      - '.claude/skills/**'
+      - 'tests/hud-check.mjs'
+      - '.github/workflows/hud-check.yml'
+  pull_request:
+    paths:
+      - 'hud/**'
+      - '.claude/skills/**'
+      - 'tests/hud-check.mjs'
+      - '.github/workflows/hud-check.yml'
+  workflow_dispatch:
+
+jobs:
+  verifier:
+    name: Le HUD répond, le coffre se remplit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'   # le plus ancien supporté (celui de macOS)
+
+      - name: Tests du serveur
+        run: python3 -m unittest hud/test_server.py -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Vérifier le HUD dans un vrai navigateur
+        run: node tests/hud-check.mjs
